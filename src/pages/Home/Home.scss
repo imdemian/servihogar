@@ -1,0 +1,15 @@
+.home {
+  display: flex;
+
+  .homeContainer {
+    flex: 6; /* Ajusta el valor según lo ancho que quieras el contenido */
+    display: flex;
+    flex-direction: column;
+
+    .content {
+      flex: 1;
+      padding: 20px;
+      /* Aquí tus estilos para el contenido principal */
+    }
+  }
+}

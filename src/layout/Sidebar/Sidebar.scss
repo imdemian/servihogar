@@ -1,0 +1,127 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #2c3e50; // Fondo industrial
+  color: #ffffff;
+  border-right: 1px solid #374151;
+  padding: 1rem;
+  transition: width 0.3s ease;
+
+  &.collapsed {
+    width: 60px; // Ajusta el ancho cuando está colapsado
+  }
+
+  .top-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+
+    .logo {
+      display: flex;
+      align-items: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #c41e3a;
+
+      svg {
+        margin-right: 0.5rem;
+      }
+    }
+
+    .toggle-btn {
+      margin-left: 5px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.2rem; // Disminuye el tamaño del ícono
+      padding: 0.2rem; // Reduce el espacio interno
+      cursor: pointer;
+
+      &:focus {
+        outline: none; // Elimina el contorno del navegador
+        border: none; // Asegura que no se muestre ningún borde
+      }
+    }
+
+    .toggle-btn:hover {
+      background-color: #3d4f60; // Cambia el color de fondo al pasar el mouse
+      border-radius: 5px; // Añade bordes redondeados
+    }
+  }
+
+  .sidebar-links {
+    display: flex;
+    flex-direction: column;
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+
+      text-decoration: none;
+      color: inherit;
+      padding: 0.75rem;
+      border-radius: 5px;
+      transition: background 0.2s;
+
+      &.active {
+        background-color: #3d4f60;
+        font-weight: bold;
+      }
+      &:hover {
+        background-color: #3d4f60;
+      }
+
+      .icon {
+        font-size: 1.2rem;
+      }
+
+      .title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-left: 0.75rem;
+      }
+    }
+
+    &.collapsed {
+      .nav-link {
+        justify-content: center;
+
+        & .title {
+          display: none; // Oculta el texto del enlace
+        }
+      }
+    }
+  }
+
+  .bottom-section {
+    margin-top: auto;
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      color: inherit;
+      padding: 0.5rem;
+      border-radius: 5px;
+      margin-bottom: 0.5rem;
+      transition: background-color 0.3s ease;
+
+      &.active,
+      &:hover {
+        background-color: #3d4f60;
+      }
+
+      .icon {
+        font-size: 1.25rem;
+      }
+
+      .title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-left: 0.75rem;
+      }
+    }
+  }
+}

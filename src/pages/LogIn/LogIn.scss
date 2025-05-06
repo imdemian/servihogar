@@ -1,0 +1,42 @@
+.logo {
+  img {
+    width: 150px; // Ajusta el tamaño según necesites
+    height: auto;
+    display: block;
+    margin: 0 auto; // Centra la imagen
+  }
+}
+
+/* Ajuste del logo */
+.logo {
+  img {
+    width: 150px; // Ajusta el tamaño según necesites
+    height: auto;
+    display: block;
+    margin: 0 auto; // Centra la imagen
+  }
+}
+
+/* Personalización de botones para que usen el color del logo */
+.btn-primary {
+  background-color: #c41e3a;
+  border-color: #c41e3a;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: #a8322f;
+  border-color: #a8322f;
+}
+
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(196, 30, 58, 0.25);
+}
+
+/* Personalización de los inputs */
+.form-control:focus {
+  border-color: #c41e3a;
+  box-shadow: 0 0 0 0.2rem rgba(196, 30, 58, 0.25);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
