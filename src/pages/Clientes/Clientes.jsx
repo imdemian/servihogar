@@ -210,14 +210,36 @@ const Clientes = () => {
         title="Equipos del cliente"
         size="md"
       >
-        <ul className="list-group">
-          {equiposList.map((eq, i) => (
-            <li key={i} className="list-group-item">
-              <strong>{eq.tipo}</strong> — {eq.marca} {eq.modelo} ( S/N:{" "}
-              {eq.numeroSerie || "N/A"})
-            </li>
+        <div className="list-group">
+          {equiposList.map((eq, idx) => (
+            <div key={idx} className="list-group-item">
+              <h6 className="mb-1">
+                {eq.tipo} — {eq.marca} {eq.modelo} (S/N:{" "}
+                {eq.numeroSerie || "N/A"})
+              </h6>
+              {eq.fotos && eq.fotos.length > 0 ? (
+                <div className="d-flex flex-wrap">
+                  {eq.fotos.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt={`Equipo ${idx} Foto ${i + 1}`}
+                      className="me-2 mb-2"
+                      style={{
+                        width: "100px",
+                        height: "100px",
+                        objectFit: "cover",
+                        borderRadius: "4px",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <small className="text-muted">Sin fotos</small>
+              )}
+            </div>
           ))}
-        </ul>
+        </div>
       </BasicModal>
     </div>
   );
