@@ -38,9 +38,7 @@ const Sidebar = () => {
       route: "/ordenesTrabajo",
       icon: faNoteSticky,
     },
-    { title: "Órdenes Test", route: "/ordenesTest", icon: faNoteSticky },
     { title: "Cotizaciones", route: "/cotizaciones", icon: faMoneyBill1 },
-    { title: "Test", route: "/test", icon: faNoteSticky },
   ];
 
   // Items inferiores (solo Salir necesita logout)

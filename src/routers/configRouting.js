@@ -3,6 +3,8 @@ import Usuarios from "../pages/Usuarios/Usuarios";
 import Empleados from "../pages/Empleados/Empleados";
 import Clientes from "../pages/Clientes/Clientes";
 import RegisterTest from "../pages/RegisterTest/RegisterTest";
+import OrdenesTrabajo from "../pages/OrdenesTrabajo/OrdenesTrabajo";
+import Cotizaciones from "../pages/Cotizaciones/Cotizaciones";
 // import EquipoFotosUploader from "../pages/test/Test";
 // import OrdenesIndustrialRest from "../pages/OrdenesIndustrial/OrdenesIndustrial.tst";
 // import FormularioOrdenServicio from "../pages/OrdenesTrabajo/OrdenesTest";
@@ -48,16 +50,16 @@ const configRouting = [
   //   page: OrdenesIndustrialRest,
   //   roles: ["ADMIN", "MANAGER", "TECNICO"],
   // },
-  // {
-  //   path: "/ordenesTest",
-  //   page: FormularioOrdenServicio,
-  //   roles: ["ADMIN", "MANAGER", "TECNICO"],
-  // },
-  // {
-  //   path: "/ordenesTrabajo",
-  //   page: OrdenesTrabajoRegistro,
-  //   roles: ["ADMIN", "MANAGER", "TECNICO"],
-  // },
+  {
+    path: "/cotizaciones",
+    page: Cotizaciones,
+    roles: ["ADMIN", "MANAGER", "TECNICO"],
+  },
+  {
+    path: "/ordenesTrabajo",
+    page: OrdenesTrabajo,
+    roles: ["ADMIN", "MANAGER", "TECNICO"],
+  },
 ];
 
 export default configRouting;

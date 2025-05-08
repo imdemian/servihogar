@@ -74,6 +74,7 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
       equipos: formData.equipos.filter((_, i) => i !== index),
     });
   };
+
   // Manejar envío del formulario (registro o edición)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,7 +82,7 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
     setLoading(true);
 
     try {
-      // 1) Si es nuevo cliente, crearlo primero sin equipos
+      // 1️⃣ Crear cliente sin equipos para obtener ID
       let clientId = cliente?.id;
       if (!cliente) {
         const res = await registrarCliente({
@@ -96,31 +97,37 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
           estado: formData.estado,
           equipos: [],
         });
-        console.log(res);
-        clientId = res.id;
+        clientId = res.id || res._id;
       }
 
-      // 2) Subir fotos de equipos si existen
+      // 2️⃣ Subir fotos: todos los archivos del mismo equipo en carpeta única por equipo,
+      //    nombrando cada archivo como Tipo_Modelo_#
       const equiposConFotos = await Promise.all(
         formData.equipos.map(async (eq, idx) => {
           if (eq.files && eq.files.length > 0) {
-            const urls = await uploadFiles(
-              eq.files,
-              (file, i) => `clientes/${clientId}/equipos/${idx}/${file.name}`
-            );
+            const folder = `clientes/${clientId}/equipos/${eq.tipo.replace(
+              /\s+/g,
+              "_"
+            )}_${eq.modelo.replace(/\s+/g, "_")}`;
+            const urls = await uploadFiles(eq.files, (file, i) => {
+              const ext = file.name.split(".").pop();
+              const tipoSafe = eq.tipo.replace(/\s+/g, "_");
+              const modeloSafe = eq.modelo.replace(/\s+/g, "_");
+              return `${folder}/${tipoSafe}_${modeloSafe}_${i + 1}.${ext}`;
+            });
             return { ...eq, fotos: urls };
           }
           return { ...eq, fotos: eq.fotos || [] };
         })
       );
 
-      // 3) Armar payload final, sin propiedad "files"
+      // 3️⃣ Armar payload final sin files
       const payload = {
         ...formData,
         equipos: equiposConFotos.map(({ files, ...keep }) => keep),
       };
 
-      // 4) Actualizar cliente (nuevo o existente)
+      // 4️⃣ Actualizar cliente con fotos
       await actualizarCliente(clientId, payload);
       toast.success(
         cliente
@@ -325,6 +332,7 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
                 <div className="me-2">
                   <input
                     type="file"
+                    multiple
                     accept="image/*"
                     className="form-control mt-2"
                     onChange={(e) => {
