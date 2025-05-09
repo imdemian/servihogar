@@ -9,6 +9,7 @@ import "./admin.js";
 import usuariosRouter from "./routes/usuariosRouter.js";
 import clientesRouter from "./routes/clientesRouter.js";
 import empleadosRouter from "./routes/empleadosRouter.js";
+import cotizacionesRouter from "./routes/cotizacionesRouter.js";
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -18,6 +19,7 @@ app.use(express.json());
 app.use("/usuarios", usuariosRouter);
 app.use("/clientes", clientesRouter);
 app.use("/empleados", empleadosRouter);
+app.use("/cotizaciones", cotizacionesRouter);
 
 // Exporta la función HTTP
 export const api = functions.https.onRequest(app);

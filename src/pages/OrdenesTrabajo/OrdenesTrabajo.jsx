@@ -3,7 +3,7 @@ import { obtenerClientes } from "../../services/clientesService";
 import { obtenerEmpleados } from "../../services/empleadosService";
 import logo from "../../assets/logoServiHogar.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import { faPlusCircle, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 
 const OrdenesTrabajo = () => {
   const [datosOrden, setDatosOrden] = useState({
@@ -416,8 +416,12 @@ const OrdenesTrabajo = () => {
             ))}
           </tbody>
         </table>
-        <button type="button" onClick={agregarEquipo} className="btn btn-link">
-          Agregar equipo
+        <button
+          type="button"
+          onClick={agregarEquipo}
+          className="btn btn-primary"
+        >
+          <FontAwesomeIcon icon={faPlusCircle} /> Agregar equipo
         </button>
       </div>
 
@@ -464,13 +468,13 @@ const OrdenesTrabajo = () => {
                   />
                 </td>
                 <td>{(s.precioUnitario * s.cantidad).toFixed(2)}</td>
-                <td>
+                <td className="text-center">
                   <button
                     type="button"
                     onClick={() => eliminarServicio(idx)}
                     className="btn btn-link text-danger"
                   >
-                    Eliminar
+                    <FontAwesomeIcon icon={faTrashCan} />
                   </button>
                 </td>
               </tr>
@@ -480,9 +484,9 @@ const OrdenesTrabajo = () => {
         <button
           type="button"
           onClick={agregarServicio}
-          className="btn btn-link"
+          className="btn btn-primary"
         >
-          Agregar servicio
+          <FontAwesomeIcon icon={faPlusCircle} /> Agregar servicio
         </button>
       </div>
 

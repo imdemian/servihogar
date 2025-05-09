@@ -1,219 +1,167 @@
-import React, { useState } from "react";
-import logo from "../../assets/logoServiHogar.png";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { obtenerCotizaciones } from "../../services/cotizacionService";
+import { toast } from "react-toastify";
+import BasicModal from "../../components/BasicModal/BasicModal";
+import RegistroCotizaciones from "./RegistroCotizaciones";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen } from "@fortawesome/free-solid-svg-icons";
 
-const Cotizaciones = () => {
-  const [items, setItems] = useState([
-    {
-      id: 1,
-      descripcion: "",
-      capacidad: "",
-      cantidad: 0,
-      costoUnitario: 0,
-      costoTotal: 0,
-    },
-  ]);
+export default function ListadoCotizaciones() {
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("pendientes");
+  const [showModal, setShowModal] = useState(false);
+  const [selectedCot, setSelectedCot] = useState(null);
+  const navigate = useNavigate();
 
-  const handleItemChange = (idx, field, value) => {
-    setItems(
-      items.map((item, i) => {
-        if (i !== idx) return item;
-        const updated = {
-          ...item,
-          [field]:
-            field === "cantidad" || field === "costoUnitario"
-              ? Number(value)
-              : value,
-        };
-        updated.costoTotal = updated.cantidad * updated.costoUnitario;
-        return updated;
-      })
+  // 1) Extraemos la carga en una función reutilizable
+  const loadCotizaciones = async () => {
+    setLoading(true);
+    try {
+      const data = await obtenerCotizaciones();
+      setCotizaciones(data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al cargar cotizaciones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCotizaciones();
+  }, []);
+
+  const byStatus = (status) =>
+    cotizaciones.filter((c) => c.status === status.toUpperCase());
+
+  const handleEdit = (cot) => {
+    setSelectedCot(cot);
+    setShowModal(true);
+  };
+
+  const renderCardTable = (status, title, bgClass) => {
+    const list = byStatus(status);
+    return (
+      <div className="col-md-6 mb-3" key={status}>
+        <div className={`card ${bgClass}`}>
+          <div className="card-header">
+            {title} ({list.length})
+          </div>
+          <div className="card-body p-0">
+            <table className="table mb-0">
+              <tbody>
+                {list.length > 0 ? (
+                  list.map((cot) => (
+                    <tr key={cot.id}>
+                      <td className="px-2 py-1">{cot.noCotizacion}</td>
+                      <td className="px-2 py-1">
+                        {new Date(cot.fechaCotizacion).toLocaleDateString()}
+                      </td>
+                      <td className="px-2 py-1">{cot.nombreCliente}</td>
+                      <td className="px-2 py-1 text-end">
+                        ${cot.total.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1">
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => handleEdit(cot)}
+                        >
+                          <FontAwesomeIcon icon={faPen} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="text-center py-3 text-muted">
+                      No hay cotizaciones
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
   };
 
-  const addItem = () => {
-    const nextId =
-      items.length > 0 ? Math.max(...items.map((i) => i.id)) + 1 : 1;
-    setItems([
-      ...items,
-      {
-        id: nextId,
-        descripcion: "",
-        capacidad: "",
-        cantidad: 0,
-        costoUnitario: 0,
-        costoTotal: 0,
-      },
-    ]);
-  };
+  if (loading) return <div>Cargando...</div>;
 
   return (
-    <form className="p-4 w-75 mx-auto bg-white shadow-lg rounded">
-      <div className="d-flex align-items-center mb-4">
-        <img
-          src={logo}
-          alt="Logo CRM"
-          width={40}
-          height={40}
-          className="me-3"
-        />
-        <h1 className="h3 mb-0">COTIZACIONES SECTOR INDUSTRIAL</h1>
-      </div>
-
-      {/* INFORMACIÓN DEL CLIENTE */}
-      <div className="row mb-4">
-        <div className="col-md-6">
-          <div className="row g-2">
-            {/* Titulo del Cliente */}
-            <div className="col-4">
-              <label htmlFor="tituloCliente" className="form-label">
-                Titulo del Cliente
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="tituloCliente"
-                placeholder="Ing, Lic, Sr, Sra, etc."
-              />
-            </div>
-
-            {/* Nombre del Cliente */}
-            <div className="col-7">
-              <label htmlFor="nombreCliente" className="form-label">
-                Nombre del Cliente
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="nombreCliente"
-                placeholder="Nombre del Cliente"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-6">
-          <div className="row g-2">
-            {/* Fecha */}
-
-            <div className="col-6">
-              <label htmlFor="fechaCotizacion" className="form-label">
-                Fecha Cotización
-              </label>
-              <input
-                type="date"
-                className="form-control"
-                id="fechaCotizacion"
-              />
-            </div>
-
-            {/* No. Cotización */}
-            <div className="col-6">
-              <label htmlFor="noCotizacion" className="form-label">
-                No. Cotización
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="noCotizacion"
-                placeholder="No. Cotización"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* LEYENDA O DESCRIPCIÓN DE LA COTIZACIÓN */}
-      <h5 className="mb-3">Leyenda de la cotización</h5>
-      <div>
-        <textarea
-          className="form-control mb-3"
-          rows="3"
-          placeholder="Descripción de la cotización"
-          id="leyendaCotizacion"
-        />
-      </div>
-
-      {/* PRODUCTOS O SERVICIOS */}
-      <h5 className="mb-3">Productos o Servicios</h5>
-      <table className="table table-bordered mb-3">
-        <thead className="bg-primary text-white">
-          <tr>
-            <th style={{ width: "5%" }}>#</th>
-            <th style={{ width: "40%" }}>DESCRIPCIÓN</th>
-            <th style={{ width: "15%" }}>CAPACIDAD</th>
-            <th style={{ width: "10%" }}>CANTIDAD</th>
-            <th style={{ width: "15%" }}>COSTO UNITARIO</th>
-            <th style={{ width: "15%" }}>COSTO TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, idx) => (
-            <tr key={item.id}>
-              <td className="align-middle text-center">{item.id}</td>
-              <td>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={item.descripcion}
-                  onChange={(e) =>
-                    handleItemChange(idx, "descripcion", e.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={item.capacidad}
-                  onChange={(e) =>
-                    handleItemChange(idx, "capacidad", e.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={item.cantidad}
-                  onChange={(e) =>
-                    handleItemChange(idx, "cantidad", e.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={item.costoUnitario}
-                  onChange={(e) =>
-                    handleItemChange(idx, "costoUnitario", e.target.value)
-                  }
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={item.costoTotal}
-                  readOnly
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="mb-4">
+    <div className="container py-4">
+      <div className="d-flex justify-content-between mb-3">
+        <h2>Cotizaciones</h2>
         <button
-          type="button"
-          className="btn btn-sm btn-outline-primary"
-          onClick={addItem}
+          className="btn btn-primary"
+          onClick={() => navigate("/registro-cotizaciones")}
         >
-          + Añadir producto/servicio
+          Registrar Cotización
         </button>
       </div>
-    </form>
-  );
-};
 
-export default Cotizaciones;
+      <ul className="nav nav-tabs mb-3">
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === "pendientes" ? "active" : ""}`}
+            onClick={() => setActiveTab("pendientes")}
+          >
+            Pendientes/Aprobadas
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === "pagadas" ? "active" : ""}`}
+            onClick={() => setActiveTab("pagadas")}
+          >
+            Pagadas
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${activeTab === "rechazadas" ? "active" : ""}`}
+            onClick={() => setActiveTab("rechazadas")}
+          >
+            Rechazadas
+          </button>
+        </li>
+      </ul>
+
+      {activeTab === "pendientes" && (
+        <div className="row">
+          {renderCardTable("PENDIENTE", "Pendientes", "bg-light")}
+          {renderCardTable("APROBADA", "Aprobadas", "bg-success text-white")}
+        </div>
+      )}
+      {activeTab === "pagadas" && (
+        <div className="row">
+          {renderCardTable("PAGADA", "Pagadas", "bg-primary text-white")}
+        </div>
+      )}
+      {activeTab === "rechazadas" && (
+        <div className="row">
+          {renderCardTable("RECHAZADA", "Rechazadas", "bg-danger text-white")}
+        </div>
+      )}
+
+      {/* 2) Modal de edición */}
+      <BasicModal
+        show={showModal}
+        setShow={setShowModal}
+        title="Editar Cotización"
+      >
+        {selectedCot && (
+          <RegistroCotizaciones
+            initialData={selectedCot}
+            onSaved={() => {
+              setShowModal(false); // cerrar modal
+              loadCotizaciones(); // recargar lista
+            }}
+          />
+        )}
+      </BasicModal>
+    </div>
+  );
+}
