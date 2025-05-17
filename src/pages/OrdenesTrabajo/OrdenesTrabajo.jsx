@@ -420,6 +420,8 @@ const OrdenesTrabajo = () => {
           type="button"
           onClick={agregarEquipo}
           className="btn btn-primary"
+          title="Añadir nuevo equipo"
+          aria-label="Añadir nuevo equipo"
         >
           <FontAwesomeIcon icon={faPlusCircle} /> Agregar equipo
         </button>

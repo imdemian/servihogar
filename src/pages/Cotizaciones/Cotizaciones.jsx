@@ -5,15 +5,24 @@ import { toast } from "react-toastify";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import RegistroCotizaciones from "./RegistroCotizaciones";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
+import {
+  faFileArrowDown,
+  faListCheck,
+  faPen,
+} from "@fortawesome/free-solid-svg-icons";
+import CambioStatusCot from "./CambioStatusCot";
+import { generateCotizacionPdf } from "../../services/pdfs/cotPDFgen";
 
 export default function ListadoCotizaciones() {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pendientes");
-  const [showModal, setShowModal] = useState(false);
-  const [selectedCot, setSelectedCot] = useState(null);
   const navigate = useNavigate();
+
+  // Propiedades del modal
+  const [showModal, setShowModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalContent, setModalContent] = useState(null);
 
   // 1) Extraemos la carga en una función reutilizable
   const loadCotizaciones = async () => {
@@ -36,9 +45,25 @@ export default function ListadoCotizaciones() {
   const byStatus = (status) =>
     cotizaciones.filter((c) => c.status === status.toUpperCase());
 
-  const handleEdit = (cot) => {
-    setSelectedCot(cot);
+  const abrirModalEdicion = (title, content) => {
+    setModalTitle(title);
+    setModalContent(content);
     setShowModal(true);
+  };
+
+  const modalChangeStatus = (title, content) => {
+    setModalTitle(title);
+    setModalContent(content);
+    setShowModal(true);
+  };
+
+  const handleDownloadPdf = async (cot) => {
+    try {
+      await generateCotizacionPdf(cot);
+    } catch (err) {
+      console.error("Error al generar PDF:", err);
+      toast.error("No se pudo descargar la cotización.");
+    }
   };
 
   const renderCardTable = (status, title, bgClass) => {
@@ -66,9 +91,48 @@ export default function ListadoCotizaciones() {
                       <td className="px-2 py-1">
                         <button
                           className="btn btn-sm btn-outline"
-                          onClick={() => handleEdit(cot)}
+                          onClick={() => {
+                            abrirModalEdicion(
+                              "Editar Cotización",
+                              <RegistroCotizaciones
+                                initialData={cot}
+                                setShowModal={setShowModal}
+                                onSaved={() => {
+                                  setShowModal(false);
+                                  // aquí podrías recargar lista, limpiar selectedCot, etc.
+                                  loadCotizaciones();
+                                }}
+                              />
+                            );
+                          }}
                         >
                           <FontAwesomeIcon icon={faPen} />
+                        </button>
+
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => {
+                            modalChangeStatus(
+                              "Cambiar status",
+                              <CambioStatusCot
+                                cotizacion={cot}
+                                setShowModal={setShowModal}
+                                onSaved={() => {
+                                  setShowModal(false);
+                                  loadCotizaciones();
+                                }}
+                              />
+                            );
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faListCheck} />
+                        </button>
+
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => handleDownloadPdf(cot)}
+                        >
+                          <FontAwesomeIcon icon={faFileArrowDown} />
                         </button>
                       </td>
                     </tr>
@@ -147,20 +211,8 @@ export default function ListadoCotizaciones() {
       )}
 
       {/* 2) Modal de edición */}
-      <BasicModal
-        show={showModal}
-        setShow={setShowModal}
-        title="Editar Cotización"
-      >
-        {selectedCot && (
-          <RegistroCotizaciones
-            initialData={selectedCot}
-            onSaved={() => {
-              setShowModal(false); // cerrar modal
-              loadCotizaciones(); // recargar lista
-            }}
-          />
-        )}
+      <BasicModal show={showModal} setShow={setShowModal} title={modalTitle}>
+        {modalContent}
       </BasicModal>
     </div>
   );

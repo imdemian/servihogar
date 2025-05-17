@@ -56,6 +56,7 @@ const LogIn = () => {
       setErrorMsg(msg);
       toast.error(msg);
     } finally {
+      navigate("/");
       setLoading(false);
     }
   };
