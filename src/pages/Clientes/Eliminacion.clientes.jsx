@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 // Asegúrate de tener implementada la función eliminarCliente en tu servicio
 import { eliminarCliente } from "../../services/clientesService";
 
-const EliminarCliente = ({ cliente, onCancel, onDeleteSuccess }) => {
+const EliminarCliente = ({ cliente, onCancel }) => {
   // Inicializa los datos del cliente; estos se usarán para mostrar la información (campos deshabilitados)
   const [formData, setFormData] = useState({
     nombre: cliente?.nombre || "",
@@ -20,6 +20,7 @@ const EliminarCliente = ({ cliente, onCancel, onDeleteSuccess }) => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  console.log(cliente);
   // Si el prop 'cliente' cambia, actualizamos formData.
   useEffect(() => {
     if (cliente) {
@@ -44,11 +45,11 @@ const EliminarCliente = ({ cliente, onCancel, onDeleteSuccess }) => {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const response = await eliminarCliente(cliente._id);
-      if (response.data && response.data.success) {
+      const response = await eliminarCliente(cliente.id);
+      console.log(response);
+      if (response.data) {
         toast.success("Cliente eliminado con éxito");
-        // Ejecutamos la función de callback para notificar que se eliminó
-        if (onDeleteSuccess) onDeleteSuccess();
+        // Ejecutamos la función
       }
     } catch (error) {
       const msg =
@@ -58,6 +59,7 @@ const EliminarCliente = ({ cliente, onCancel, onDeleteSuccess }) => {
       toast.error(msg);
     } finally {
       setLoading(false);
+      onCancel();
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import {
   actualizarCliente,
@@ -6,11 +6,9 @@ import {
 } from "../../services/clientesService";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCirclePlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
-import { uploadFiles } from "../../services/storageService";
-// import { subirMultiples } from "../../services/apis/cloudinary/cloudinary";
+import { generarEquipoId } from "./helpers";
 
 const RegistroClientes = ({ cliente, setShowModal }) => {
-  // Inicializar datos, incluyendo 'equipos' como arreglo
   const [formData, setFormData] = useState({
     nombre: cliente?.nombre || "",
     apellidoPaterno: cliente?.apellidoPaterno || "",
@@ -26,7 +24,7 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Si se pasa un 'cliente' para edición, actualiza formData
+  // Si recibimos un cliente para editar, precargamos el formData
   useEffect(() => {
     if (cliente) {
       setFormData({
@@ -44,19 +42,16 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
     }
   }, [cliente]);
 
-  // Manejar cambios de texto en los campos generales del formulario
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Función para actualizar un campo dentro de un equipo
   const handleEquipoChange = (index, e) => {
     const updated = [...formData.equipos];
     updated[index] = { ...updated[index], [e.target.name]: e.target.value };
     setFormData({ ...formData, equipos: updated });
   };
 
-  // Función para agregar un nuevo equipo (con campos vacíos)
   const addEquipo = () => {
     setFormData({
       ...formData,
@@ -67,7 +62,6 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
     });
   };
 
-  // Función para eliminar un equipo por índice
   const removeEquipo = (index) => {
     setFormData({
       ...formData,
@@ -75,15 +69,14 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
     });
   };
 
-  // Manejar envío del formulario (registro o edición)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
     try {
-      // 1️⃣ Crear cliente sin equipos para obtener ID
       let clientId = cliente?.id;
+      // 1) Creamos cliente si es nuevo
       if (!cliente) {
         const res = await registrarCliente({
           nombre: formData.nombre,
@@ -95,40 +88,23 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
           preferenciasContacto: formData.preferenciasContacto,
           notas: formData.notas,
           estado: formData.estado,
-          equipos: [],
+          equipos: [], // sin equipos inicialmente
         });
         clientId = res.id || res._id;
       }
 
-      // 2️⃣ Subir fotos: todos los archivos del mismo equipo en carpeta única por equipo,
-      //    nombrando cada archivo como Tipo_Modelo_#
-      const equiposConFotos = await Promise.all(
-        formData.equipos.map(async (eq, idx) => {
-          if (eq.files && eq.files.length > 0) {
-            const folder = `clientes/${clientId}/equipos/${eq.tipo.replace(
-              /\s+/g,
-              "_"
-            )}_${eq.modelo.replace(/\s+/g, "_")}`;
-            const urls = await uploadFiles(eq.files, (file, i) => {
-              const ext = file.name.split(".").pop();
-              const tipoSafe = eq.tipo.replace(/\s+/g, "_");
-              const modeloSafe = eq.modelo.replace(/\s+/g, "_");
-              return `${folder}/${tipoSafe}_${modeloSafe}_${i + 1}.${ext}`;
-            });
-            return { ...eq, fotos: urls };
-          }
-          return { ...eq, fotos: eq.fotos || [] };
-        })
-      );
+      const equiposConId = formData.equipos.map((eq) => ({
+        ...eq,
+        id: generarEquipoId(eq),
+      }));
 
-      // 3️⃣ Armar payload final sin files
+      // 2) Registramos/actualizamos equipos en perfil
       const payload = {
         ...formData,
-        equipos: equiposConFotos.map(({ files, ...keep }) => keep),
+        equipos: equiposConId,
       };
-
-      // 4️⃣ Actualizar cliente con fotos
       await actualizarCliente(clientId, payload);
+
       toast.success(
         cliente
           ? "Cliente actualizado correctamente"
@@ -136,7 +112,7 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
       );
       setShowModal(false);
     } catch (error) {
-      console.error("Error en registro/actualización de cliente:", error);
+      console.error(error);
       setErrorMsg(error.response?.data?.message || error.message);
       toast.error(error.response?.data?.message || "Error al procesar cliente");
     } finally {
@@ -151,238 +127,156 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
       </h2>
       {errorMsg && <div className="alert alert-danger">{errorMsg}</div>}
       <form onSubmit={handleSubmit}>
-        {/* Campos generales del cliente */}
-        <div className="row">
-          <div className="col-md-4 mb-3">
-            <label htmlFor="nombre" className="form-label">
-              Nombre
-            </label>
+        {/* Datos básicos */}
+        <div className="row mb-3">
+          <div className="col-md-4">
+            <label className="form-label">Nombre</label>
             <input
-              type="text"
               name="nombre"
-              id="nombre"
-              placeholder="Ingresa el nombre"
+              className="form-control"
               value={formData.nombre}
               onChange={handleChange}
               required
-              className="form-control"
             />
           </div>
-          <div className="col-md-4 mb-3">
-            <label htmlFor="apellidoPaterno" className="form-label">
-              Apellido Paterno
-            </label>
+          <div className="col-md-4">
+            <label className="form-label">Apellido Paterno</label>
             <input
-              type="text"
               name="apellidoPaterno"
-              id="apellidoPaterno"
-              placeholder="Ingresa el apellido paterno"
+              className="form-control"
               value={formData.apellidoPaterno}
               onChange={handleChange}
               required
-              className="form-control"
             />
           </div>
-          <div className="col-md-4 mb-3">
-            <label htmlFor="apellidoMaterno" className="form-label">
-              Apellido Materno
-            </label>
+          <div className="col-md-4">
+            <label className="form-label">Apellido Materno</label>
             <input
-              type="text"
               name="apellidoMaterno"
-              id="apellidoMaterno"
-              placeholder="Ingresa el apellido materno"
+              className="form-control"
               value={formData.apellidoMaterno}
               onChange={handleChange}
-              className="form-control"
             />
           </div>
         </div>
-
-        <div className="row">
+        <div className="row mb-3">
           <div className="col-md-6">
-            <div className="mb-3">
-              <label htmlFor="telefono" className="form-label">
-                Teléfono
-              </label>
-              <input
-                type="text"
-                name="telefono"
-                id="telefono"
-                placeholder="Ingresa el teléfono"
-                value={formData.telefono}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label htmlFor="email" className="form-label">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                id="email"
-                placeholder="Ingresa el email"
-                value={formData.email}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
+            <label className="form-label">Teléfono</label>
+            <input
+              name="telefono"
+              className="form-control"
+              value={formData.telefono}
+              onChange={handleChange}
+            />
           </div>
           <div className="col-md-6">
-            <div className="mb-3">
-              <label htmlFor="preferenciasContacto" className="form-label">
-                Preferencias de Contacto
-              </label>
-              <input
-                type="text"
-                name="preferenciasContacto"
-                id="preferenciasContacto"
-                placeholder="Llamadas, WhatsApp, Email"
-                value={formData.preferenciasContacto}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-            <div className="mb-3">
-              <label htmlFor="prefernciasContacto" className="form-label">
-                Direccion
-              </label>
-              <textarea
-                name="direccion"
-                id="direccion"
-                placeholder="Agregar direccion"
-                value={formData.direccion}
-                onChange={handleChange}
-                className="form-control"
-                rows="2"
-              ></textarea>
-            </div>
+            <label className="form-label">Email</label>
+            <input
+              name="email"
+              type="email"
+              className="form-control"
+              value={formData.email}
+              onChange={handleChange}
+            />
           </div>
         </div>
+        <div className="mb-3">
+          <label className="form-label">Dirección</label>
+          <textarea
+            name="direccion"
+            className="form-control"
+            rows={2}
+            value={formData.direccion}
+            onChange={handleChange}
+          />
+        </div>
 
-        {/* Sección de Equipos */}
+        {/* Equipos */}
         <div className="mb-3">
           <h5>Equipos</h5>
-          {formData.equipos.map((equipo, index) => (
-            <div key={index} className="equipo-item border p-2 d-flex flex-row">
-              <div className="d-flex flex-column">
-                <div className="d-flex flex-row mb-2">
-                  <div className="me-2">
-                    <label htmlFor={`tipo-${index}`} className="form-label">
-                      Tipo
-                    </label>
-                    <input
-                      type="text"
-                      id={`tipo-${index}`}
-                      name="tipo"
-                      placeholder="Tipo de equipo"
-                      value={equipo.tipo || ""}
-                      onChange={(e) => handleEquipoChange(index, e)}
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="me-2">
-                    <label htmlFor={`marca-${index}`} className="form-label">
-                      Marca
-                    </label>
-                    <input
-                      type="text"
-                      id={`marca-${index}`}
-                      name="marca"
-                      placeholder="Marca"
-                      value={equipo.marca || ""}
-                      onChange={(e) => handleEquipoChange(index, e)}
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="me-2">
-                    <label htmlFor={`modelo-${index}`} className="form-label">
-                      Modelo
-                    </label>
-                    <input
-                      type="text"
-                      id={`modelo-${index}`}
-                      name="modelo"
-                      placeholder="Modelo"
-                      value={equipo.modelo || ""}
-                      onChange={(e) => handleEquipoChange(index, e)}
-                      className="form-control"
-                    />
-                  </div>
-                  <div className="me-2">
-                    <label
-                      htmlFor={`numeroSerie-${index}`}
-                      className="form-label"
-                    >
-                      No. Serie
-                    </label>
-                    <input
-                      type="text"
-                      id={`numeroSerie-${index}`}
-                      name="numeroSerie"
-                      placeholder="Número de serie"
-                      value={equipo.numeroSerie || ""}
-                      onChange={(e) => handleEquipoChange(index, e)}
-                      className="form-control"
-                    />
-                  </div>
-                </div>
-                <div className="me-2">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    className="form-control mt-2"
-                    onChange={(e) => {
-                      const files = e.target.files;
-                      if (files && files.length > 0) {
-                        const updatedEquipos = [...formData.equipos];
-                        updatedEquipos[index].files = files;
-                        setFormData({ ...formData, equipos: updatedEquipos });
-                      }
-                    }}
-                    placeholder="Subir foto del equipo"
-                  />
-                </div>
+          {formData.equipos.map((eq, idx) => (
+            <div
+              key={idx}
+              className="border p-3 mb-2 d-flex align-items-end gap-2"
+            >
+              <div className="flex-fill">
+                <label className="form-label">Tipo</label>
+                <input
+                  name="tipo"
+                  className="form-control"
+                  value={eq.tipo}
+                  onChange={(e) => handleEquipoChange(idx, e)}
+                />
+              </div>
+              <div className="flex-fill">
+                <label className="form-label">Marca</label>
+                <input
+                  name="marca"
+                  className="form-control"
+                  value={eq.marca}
+                  onChange={(e) => handleEquipoChange(idx, e)}
+                />
+              </div>
+              <div className="flex-fill">
+                <label className="form-label">Modelo</label>
+                <input
+                  name="modelo"
+                  className="form-control"
+                  value={eq.modelo}
+                  onChange={(e) => handleEquipoChange(idx, e)}
+                />
+              </div>
+              <div className="flex-fill">
+                <label className="form-label">No. Serie</label>
+                <input
+                  name="numeroSerie"
+                  className="form-control"
+                  value={eq.numeroSerie}
+                  onChange={(e) => handleEquipoChange(idx, e)}
+                />
               </div>
               <button
                 type="button"
-                className="btn btn-danger btn-sm"
-                onClick={() => removeEquipo(index)}
+                className="btn btn-outline-danger align-self-start"
+                onClick={() => removeEquipo(idx)}
               >
-                <FontAwesomeIcon icon={faTrashCan} size="lg" />
+                <FontAwesomeIcon icon={faTrashCan} />
               </button>
             </div>
           ))}
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="btn btn-outline-primary"
             onClick={addEquipo}
           >
             <FontAwesomeIcon icon={faCirclePlus} /> Agregar Equipo
           </button>
         </div>
 
-        {/* Fin de la sección de Equipos */}
-
+        {/* Notas y preferencias */}
         <div className="mb-3">
-          <label htmlFor="notas" className="form-label">
-            Notas
-          </label>
+          <label className="form-label">Notas</label>
           <textarea
             name="notas"
-            id="notas"
-            placeholder="Agregar notas"
+            className="form-control"
+            rows={3}
             value={formData.notas}
             onChange={handleChange}
-            className="form-control"
-            rows="3"
-          ></textarea>
+          />
         </div>
-        <button type="submit" className="btn btn-success w-100">
-          {cliente ? "Actualizar Cliente" : "Registrar Cliente"}
+
+        <button
+          type="submit"
+          className="btn btn-success w-100"
+          disabled={loading}
+        >
+          {loading
+            ? cliente
+              ? "Guardando…"
+              : "Registrando…"
+            : cliente
+            ? "Actualizar Cliente"
+            : "Registrar Cliente"}
         </button>
       </form>
     </div>

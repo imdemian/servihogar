@@ -21,11 +21,16 @@ const OrdenesTrabajo = () => {
     fechaFinalizacion: "",
     fechaEntrega: "",
     equipos: [
-      { equipoId: "", marca: "", modelo: "", serie: "", observacion: "" },
+      {
+        equipoId: "",
+        marca: "",
+        modelo: "",
+        numeroSerie: "",
+        observacion: "",
+      },
     ],
     servicios: [{ servicio: "", precioUnitario: 0, cantidad: 1 }],
-    tecnico: "",
-    estado: "",
+    tecnicosAsignados: [],
     firma: "",
   });
 
@@ -33,38 +38,44 @@ const OrdenesTrabajo = () => {
   const [empleados, setEmpleados] = useState([]);
   const [equiposDisponibles, setEquiposDisponibles] = useState([]);
 
-  // Cargar clientes y empleados
+  // 1) Cargo inicial de clientes y técnicos
   useEffect(() => {
-    const cargarListas = async () => {
+    (async () => {
       try {
-        const listaClientes = await obtenerClientes();
-        setClientes(listaClientes || []);
-        const listaEmpleados = await obtenerEmpleados();
-        setEmpleados(listaEmpleados || []);
-      } catch (error) {
-        console.error("Error al cargar listas:", error);
+        const [cData, eData] = await Promise.all([
+          obtenerClientes(),
+          obtenerEmpleados(),
+        ]);
+        setClientes(cData || []);
+        setEmpleados(eData || []);
+      } catch (err) {
+        console.error("Error al cargar listas:", err);
       }
-    };
-    cargarListas();
+    })();
   }, []);
 
-  // Al cambiar cliente: autocompletar datos y asignar equipos locales
+  // 2) Cuando cambie el cliente, relleno teléfono/dirección y equipos disponibles
   useEffect(() => {
     if (!datosOrden.cliente) return;
-    const seleccionado =
-      clientes.find((c) => c.id === datosOrden.cliente) || {};
+    const cli = clientes.find((c) => c.id === datosOrden.cliente) || {};
     setDatosOrden((prev) => ({
       ...prev,
-      telefono: seleccionado.telefono || "",
-      direccion: seleccionado.direccion || "",
+      telefono: cli.telefono || "",
+      direccion: cli.direccion || "",
       equipos: [
-        { equipoId: "", marca: "", modelo: "", serie: "", observacion: "" },
+        {
+          equipoId: "",
+          marca: "",
+          modelo: "",
+          numeroSerie: "",
+          observacion: "",
+        },
       ],
     }));
-    console.log(seleccionado.equipos);
-    setEquiposDisponibles(seleccionado.equipos || []);
+    setEquiposDisponibles(cli.equipos || []);
   }, [datosOrden.cliente, clientes]);
 
+  // Manejador genérico de inputs simples
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setDatosOrden((prev) => ({
@@ -73,8 +84,13 @@ const OrdenesTrabajo = () => {
     }));
   };
 
-  console.log(equiposDisponibles);
+  // Manejador para selección múltiple de técnicos
+  const handleTecnicosChange = (e) => {
+    const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
+    setDatosOrden((prev) => ({ ...prev, tecnicosAsignados: opts }));
+  };
 
+  // Manejador para los equipos: al cambiar equipoId rellena marca/modelo/serie
   const handleEquipmentChange = (index, e) => {
     const { name, value } = e.target;
     setDatosOrden((prev) => {
@@ -85,8 +101,8 @@ const OrdenesTrabajo = () => {
           equipoId: value,
           marca: sel.marca || "",
           modelo: sel.modelo || "",
-          serie: sel.serie || "",
-          observacion: "",
+          numeroSerie: sel.serie || "", // asumimos que tu API usa `serie`
+          observacion: lista[index].observacion || "",
         };
       } else {
         lista[index] = { ...lista[index], [name]: value };
@@ -100,7 +116,13 @@ const OrdenesTrabajo = () => {
       ...prev,
       equipos: [
         ...prev.equipos,
-        { equipoId: "", marca: "", modelo: "", serie: "", observacion: "" },
+        {
+          equipoId: "",
+          marca: "",
+          modelo: "",
+          numeroSerie: "",
+          observacion: "",
+        },
       ],
     }));
 
@@ -110,20 +132,20 @@ const OrdenesTrabajo = () => {
       equipos: prev.equipos.filter((_, idx) => idx !== i),
     }));
 
-  const handleServiceChange = (index, e) => {
+  // Servicios (igual que antes)
+  const handleServiceChange = (i, e) => {
     const { name, value } = e.target;
     setDatosOrden((prev) => {
-      const lista = [...prev.servicios];
-      lista[index] = {
-        ...lista[index],
+      const servs = [...prev.servicios];
+      servs[i] = {
+        ...servs[i],
         [name]: ["precioUnitario", "cantidad"].includes(name)
           ? parseFloat(value)
           : value,
       };
-      return { ...prev, servicios: lista };
+      return { ...prev, servicios: servs };
     });
   };
-
   const agregarServicio = () =>
     setDatosOrden((prev) => ({
       ...prev,
@@ -132,7 +154,6 @@ const OrdenesTrabajo = () => {
         { servicio: "", precioUnitario: 0, cantidad: 1 },
       ],
     }));
-
   const eliminarServicio = (i) =>
     setDatosOrden((prev) => ({
       ...prev,
@@ -140,7 +161,7 @@ const OrdenesTrabajo = () => {
     }));
 
   const costoTotal = datosOrden.servicios.reduce(
-    (suma, s) => suma + s.precioUnitario * s.cantidad,
+    (sum, s) => sum + s.precioUnitario * s.cantidad,
     0
   );
 
@@ -150,162 +171,21 @@ const OrdenesTrabajo = () => {
       onSubmit={(e) => e.preventDefault()}
     >
       <div className="d-flex align-items-center mb-4">
-        <img
-          src={logo}
-          alt="Logo CRM"
-          width={40}
-          height={40}
-          className="me-3"
-        />
+        <img src={logo} alt="Logo" width={40} height={40} className="me-3" />
         <h1 className="h3 mb-0">ORDEN DE SERVICIO</h1>
       </div>
 
-      {/* Facturación y Fechas */}
-      <div className="row mb-4">
+      {/* === Cliente === */}
+      <div className="row mb-3">
         <div className="col-md-6">
-          <div className="form-check mb-2">
-            <input
-              id="requiereFactura"
-              name="requiereFactura"
-              type="checkbox"
-              className="form-check-input border border-2 rounded me-2 check-titulo"
-              checked={datosOrden.requiereFactura}
-              onChange={handleChange}
-            />
-            <label
-              htmlFor="requiereFactura"
-              className="form-check-label h5 mb-0"
-            >
-              Facturación
-            </label>
-          </div>
-          {datosOrden.requiereFactura && (
-            <div className="row g-2 mt-2">
-              <div className="col-6">
-                <label htmlFor="rfc" className="form-label">
-                  RFC
-                </label>
-                <input
-                  id="rfc"
-                  name="rfc"
-                  value={datosOrden.rfc}
-                  onChange={handleChange}
-                  className="form-control"
-                />
-              </div>
-              <div className="col-6">
-                <label htmlFor="formaPago" className="form-label">
-                  Forma de Pago
-                </label>
-                <input
-                  id="formaPago"
-                  name="formaPago"
-                  value={datosOrden.formaPago}
-                  onChange={handleChange}
-                  className="form-control"
-                />
-              </div>
-              <div className="col-6">
-                <label htmlFor="metodoPago" className="form-label">
-                  Método de Pago
-                </label>
-                <input
-                  id="metodoPago"
-                  name="metodoPago"
-                  value={datosOrden.metodoPago}
-                  onChange={handleChange}
-                  className="form-control"
-                />
-              </div>
-              <div className="col-6">
-                <label htmlFor="usoCfdi" className="form-label">
-                  Uso de CFDI
-                </label>
-                <input
-                  id="usoCfdi"
-                  name="usoCfdi"
-                  value={datosOrden.usoCfdi}
-                  onChange={handleChange}
-                  className="form-control"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="col-md-6">
-          <h5>Fechas</h5>
-          <div className="row g-2">
-            <div className="col-6">
-              <label htmlFor="fechaCreacion" className="form-label">
-                Creación
-              </label>
-              <input
-                id="fechaCreacion"
-                name="fechaCreacion"
-                type="date"
-                value={datosOrden.fechaCreacion}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-            <div className="col-6">
-              <label htmlFor="fechaIngreso" className="form-label">
-                Ingreso/Inicio
-              </label>
-              <input
-                id="fechaIngreso"
-                name="fechaIngreso"
-                type="date"
-                value={datosOrden.fechaIngreso}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-            <div className="col-6">
-              <label htmlFor="fechaFinalizacion" className="form-label">
-                Finalización
-              </label>
-              <input
-                id="fechaFinalizacion"
-                name="fechaFinalizacion"
-                type="date"
-                value={datosOrden.fechaFinalizacion}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-            <div className="col-6">
-              <label htmlFor="fechaEntrega" className="form-label">
-                Entrega
-              </label>
-              <input
-                id="fechaEntrega"
-                name="fechaEntrega"
-                type="date"
-                value={datosOrden.fechaEntrega}
-                onChange={handleChange}
-                className="form-control"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Datos del Cliente */}
-      <h5 className="mb-3">Datos del Cliente</h5>
-      <div className="row g-3 mb-4">
-        <div className="col-md-6">
-          <label htmlFor="cliente" className="form-label">
-            Cliente
-          </label>
+          <label className="form-label">Cliente</label>
           <select
-            id="cliente"
             name="cliente"
-            value={datosOrden.cliente}
-            onChange={handleChange}
             className="form-select"
+            value={datosOrden.cliente || ""}
+            onChange={handleChange}
           >
-            <option value="">Seleccione un cliente</option>
+            <option value="">Seleccione cliente</option>
             {clientes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nombre}
@@ -313,200 +193,200 @@ const OrdenesTrabajo = () => {
             ))}
           </select>
         </div>
-        <div className="col-md-6">
-          <label htmlFor="telefono" className="form-label">
-            Teléfono
-          </label>
+        <div className="col-md-3">
+          <label className="form-label">Teléfono</label>
           <input
-            id="telefono"
-            name="telefono"
-            value={datosOrden.telefono}
             readOnly
             className="form-control"
+            value={datosOrden.telefono || ""}
           />
         </div>
-        <div className="col-12">
-          <label htmlFor="direccion" className="form-label">
-            Dirección
-          </label>
+        <div className="col-md-3">
+          <label className="form-label">Dirección</label>
           <input
-            id="direccion"
-            name="direccion"
-            value={datosOrden.direccion}
             readOnly
             className="form-control"
+            value={datosOrden.direccion || ""}
           />
         </div>
       </div>
 
-      {/* Equipos */}
-      <h5 className="mb-3">Equipos</h5>
-      <div className="mb-4">
-        <table className="table table-bordered">
-          <thead>
-            <tr>
-              <th>Equipo</th>
-              <th>Marca</th>
-              <th>Modelo</th>
-              <th>No. Serie</th>
-              <th>Observación</th>
-              <th>Acciones</th>
+      {/* === Equipos === */}
+      <h5>Equipos</h5>
+      <table className="table table-bordered mb-3">
+        <thead>
+          <tr>
+            <th>Equipo</th>
+            <th>Marca</th>
+            <th>Modelo</th>
+            <th>No. Serie</th>
+            <th>Observación</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {datosOrden.equipos.map((eq, idx) => (
+            <tr key={`${eq.equipoId}-${idx}`}>
+              <td>
+                <select
+                  name="equipoId"
+                  className="form-select"
+                  value={eq.equipoId || ""}
+                  onChange={(e) => handleEquipmentChange(idx, e)}
+                >
+                  <option value="">Seleccione equipo</option>
+                  {equiposDisponibles.map((ed) => (
+                    <option key={ed.id} value={ed.id}>
+                      {ed.tipo}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <input
+                  readOnly
+                  className="form-control"
+                  value={eq.marca || ""}
+                />
+              </td>
+              <td>
+                <input
+                  readOnly
+                  className="form-control"
+                  value={eq.modelo || ""}
+                />
+              </td>
+              <td>
+                <input
+                  readOnly
+                  className="form-control"
+                  value={eq.numeroSerie || ""}
+                />
+              </td>
+              <td>
+                <input
+                  name="observacion"
+                  className="form-control"
+                  value={eq.observacion || ""}
+                  onChange={(e) => handleEquipmentChange(idx, e)}
+                />
+              </td>
+              <td className="text-center">
+                <button
+                  type="button"
+                  className="btn btn-link text-danger"
+                  onClick={() => eliminarEquipo(idx)}
+                >
+                  <FontAwesomeIcon icon={faTrashCan} />
+                </button>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {datosOrden.equipos.map((eq, idx) => (
-              <tr key={idx}>
-                <td>
-                  <select
-                    name="equipoId"
-                    value={eq.equipoId}
-                    onChange={(e) => handleEquipmentChange(idx, e)}
-                    className="form-select"
-                  >
-                    <option value="">Seleccione equipo</option>
-                    {equiposDisponibles.map((ed) => (
-                      <option key={ed.id} value={ed.id}>
-                        {ed.tipo}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    name="marca"
-                    value={eq.marca}
-                    readOnly
-                    className="form-control"
-                  />
-                </td>
-                <td>
-                  <input
-                    name="modelo"
-                    value={eq.modelo}
-                    readOnly
-                    className="form-control"
-                  />
-                </td>
-                <td>
-                  <input
-                    name="serie"
-                    value={eq.serie}
-                    readOnly
-                    className="form-control"
-                  />
-                </td>
-                <td>
-                  <input
-                    name="observacion"
-                    value={eq.observacion}
-                    onChange={(e) => handleEquipmentChange(idx, e)}
-                    className="form-control"
-                  />
-                </td>
-                <td className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => eliminarEquipo(idx)}
-                    className="btn btn-link text-danger"
-                  >
-                    <FontAwesomeIcon icon={faTrashCan} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={agregarEquipo}
-          className="btn btn-primary"
-          title="Añadir nuevo equipo"
-          aria-label="Añadir nuevo equipo"
+          ))}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        className="btn btn-primary mb-4"
+        onClick={agregarEquipo}
+      >
+        <FontAwesomeIcon icon={faPlusCircle} /> Agregar equipo
+      </button>
+
+      {/* === Servicios === */}
+      <h5>Servicios</h5>
+      <table className="table table-bordered mb-3">
+        <thead>
+          <tr>
+            <th>Servicio</th>
+            <th>Precio Unitario</th>
+            <th>Cantidad</th>
+            <th>Total</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {datosOrden.servicios.map((s, i) => (
+            <tr key={`serv-${i}`}>
+              <td>
+                <input
+                  name="servicio"
+                  className="form-control"
+                  value={s.servicio || ""}
+                  onChange={(e) => handleServiceChange(i, e)}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  name="precioUnitario"
+                  className="form-control"
+                  value={s.precioUnitario}
+                  onChange={(e) => handleServiceChange(i, e)}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  name="cantidad"
+                  className="form-control"
+                  value={s.cantidad}
+                  onChange={(e) => handleServiceChange(i, e)}
+                />
+              </td>
+              <td>{(s.precioUnitario * s.cantidad).toFixed(2)}</td>
+              <td className="text-center">
+                <button
+                  type="button"
+                  className="btn btn-link text-danger"
+                  onClick={() => eliminarServicio(i)}
+                >
+                  <FontAwesomeIcon icon={faTrashCan} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        className="btn btn-primary mb-4"
+        onClick={agregarServicio}
+      >
+        <FontAwesomeIcon icon={faPlusCircle} /> Agregar servicio
+      </button>
+
+      {/* === Técnicos asignados === */}
+      <div className="mb-4">
+        <label className="form-label">Técnicos asignados</label>
+        <select
+          multiple
+          className="form-select"
+          value={datosOrden.tecnicosAsignados}
+          onChange={handleTecnicosChange}
         >
-          <FontAwesomeIcon icon={faPlusCircle} /> Agregar equipo
-        </button>
+          {empleados.map((emp) => (
+            <option key={emp._id} value={emp._id}>
+              {emp.nombre} {emp.apellidoPaterno}
+            </option>
+          ))}
+        </select>
+        <small className="text-muted">
+          Ctrl/Cmd + click para seleccionar varios
+        </small>
       </div>
 
-      {/* Servicios */}
-      <h5 className="mb-3">Servicios</h5>
-      <div className="mb-4">
-        <table className="table table-bordered">
-          <thead>
-            <tr>
-              <th>Servicio</th>
-              <th>Precio Unitario</th>
-              <th>Cantidad</th>
-              <th>Total</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {datosOrden.servicios.map((s, idx) => (
-              <tr key={idx}>
-                <td>
-                  <input
-                    name="servicio"
-                    value={s.servicio}
-                    onChange={(e) => handleServiceChange(idx, e)}
-                    className="form-control"
-                  />
-                </td>
-                <td>
-                  <input
-                    name="precioUnitario"
-                    type="number"
-                    value={s.precioUnitario}
-                    onChange={(e) => handleServiceChange(idx, e)}
-                    className="form-control"
-                  />
-                </td>
-                <td>
-                  <input
-                    name="cantidad"
-                    type="number"
-                    value={s.cantidad}
-                    onChange={(e) => handleServiceChange(idx, e)}
-                    className="form-control"
-                  />
-                </td>
-                <td>{(s.precioUnitario * s.cantidad).toFixed(2)}</td>
-                <td className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => eliminarServicio(idx)}
-                    className="btn btn-link text-danger"
-                  >
-                    <FontAwesomeIcon icon={faTrashCan} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <button
-          type="button"
-          onClick={agregarServicio}
-          className="btn btn-primary"
-        >
-          <FontAwesomeIcon icon={faPlusCircle} /> Agregar servicio
-        </button>
-      </div>
-
-      {/* Total y Firma */}
+      {/* === Total y Firma === */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <span className="fw-semibold">Costo Total:</span>
         <span className="h5">{costoTotal.toFixed(2)}</span>
       </div>
       <div className="mb-4">
-        <label htmlFor="firma" className="form-label">
-          Firma del Cliente
-        </label>
+        <label className="form-label">Firma del Cliente</label>
         <input
-          id="firma"
           name="firma"
-          value={datosOrden.firma}
-          onChange={handleChange}
           className="form-control"
+          value={datosOrden.firma || ""}
+          onChange={handleChange}
         />
       </div>
 

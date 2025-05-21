@@ -55,5 +55,6 @@ export async function actualizarCliente(id, data) {
 // Eliminar cliente
 export async function eliminarCliente(id) {
   const headers = await authHeaders();
-  await axios.delete(`${BASE}/clientes/${id}`, { headers });
+  const res = await axios.delete(`${BASE}/clientes/${id}`, { headers });
+  return res;
 }
