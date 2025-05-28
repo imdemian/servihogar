@@ -1,15 +1,25 @@
-.home {
+.dashboard-toolbar {
   display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
 
-  .homeContainer {
-    flex: 6; /* Ajusta el valor según lo ancho que quieras el contenido */
-    display: flex;
-    flex-direction: column;
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+}
 
-    .content {
-      flex: 1;
-      padding: 20px;
-      /* Aquí tus estilos para el contenido principal */
-    }
+.dashboard-panel {
+  background: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+
+  h2 {
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+    color: #333;
   }
 }

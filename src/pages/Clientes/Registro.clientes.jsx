@@ -5,8 +5,6 @@ import {
   registrarCliente,
 } from "../../services/clientesService";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCirclePlus, faTrashCan } from "@fortawesome/free-solid-svg-icons";
-import { generarEquipoId } from "./helpers";
 
 const RegistroClientes = ({ cliente, setShowModal }) => {
   const [formData, setFormData] = useState({
@@ -34,7 +32,6 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
         telefono: cliente.telefono || "",
         email: cliente.email || "",
         direccion: cliente.direccion || "",
-        equipos: cliente.equipos || [],
         preferenciasContacto: cliente.preferenciasContacto || [],
         notas: cliente.notas || "",
         estado: cliente.estado || "activo",
@@ -46,39 +43,17 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleEquipoChange = (index, e) => {
-    const updated = [...formData.equipos];
-    updated[index] = { ...updated[index], [e.target.name]: e.target.value };
-    setFormData({ ...formData, equipos: updated });
-  };
-
-  const addEquipo = () => {
-    setFormData({
-      ...formData,
-      equipos: [
-        ...formData.equipos,
-        { tipo: "", marca: "", modelo: "", numeroSerie: "" },
-      ],
-    });
-  };
-
-  const removeEquipo = (index) => {
-    setFormData({
-      ...formData,
-      equipos: formData.equipos.filter((_, i) => i !== index),
-    });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg(null);
     setLoading(true);
 
     try {
-      let clientId = cliente?.id;
+      let res;
+
       // 1) Creamos cliente si es nuevo
       if (!cliente) {
-        const res = await registrarCliente({
+        res = await registrarCliente({
           nombre: formData.nombre,
           apellidoPaterno: formData.apellidoPaterno,
           apellidoMaterno: formData.apellidoMaterno,
@@ -88,22 +63,24 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
           preferenciasContacto: formData.preferenciasContacto,
           notas: formData.notas,
           estado: formData.estado,
-          equipos: [], // sin equipos inicialmente
         });
-        clientId = res.id || res._id;
+      } else {
+        res = await actualizarCliente(cliente.id, {
+          nombre: formData.nombre,
+          apellidoPaterno: formData.apellidoPaterno,
+          apellidoMaterno: formData.apellidoMaterno,
+          telefono: formData.telefono,
+          email: formData.email,
+          direccion: formData.direccion,
+          preferenciasContacto: formData.preferenciasContacto,
+          notas: formData.notas,
+          estado: formData.estado,
+        });
       }
 
-      const equiposConId = formData.equipos.map((eq) => ({
-        ...eq,
-        id: generarEquipoId(eq),
-      }));
-
-      // 2) Registramos/actualizamos equipos en perfil
-      const payload = {
-        ...formData,
-        equipos: equiposConId,
-      };
-      await actualizarCliente(clientId, payload);
+      if (!res) {
+        throw new Error("Error al registrar/actualizar cliente");
+      }
 
       toast.success(
         cliente
@@ -189,68 +166,6 @@ const RegistroClientes = ({ cliente, setShowModal }) => {
             value={formData.direccion}
             onChange={handleChange}
           />
-        </div>
-
-        {/* Equipos */}
-        <div className="mb-3">
-          <h5>Equipos</h5>
-          {formData.equipos.map((eq, idx) => (
-            <div
-              key={idx}
-              className="border p-3 mb-2 d-flex align-items-end gap-2"
-            >
-              <div className="flex-fill">
-                <label className="form-label">Tipo</label>
-                <input
-                  name="tipo"
-                  className="form-control"
-                  value={eq.tipo}
-                  onChange={(e) => handleEquipoChange(idx, e)}
-                />
-              </div>
-              <div className="flex-fill">
-                <label className="form-label">Marca</label>
-                <input
-                  name="marca"
-                  className="form-control"
-                  value={eq.marca}
-                  onChange={(e) => handleEquipoChange(idx, e)}
-                />
-              </div>
-              <div className="flex-fill">
-                <label className="form-label">Modelo</label>
-                <input
-                  name="modelo"
-                  className="form-control"
-                  value={eq.modelo}
-                  onChange={(e) => handleEquipoChange(idx, e)}
-                />
-              </div>
-              <div className="flex-fill">
-                <label className="form-label">No. Serie</label>
-                <input
-                  name="numeroSerie"
-                  className="form-control"
-                  value={eq.numeroSerie}
-                  onChange={(e) => handleEquipoChange(idx, e)}
-                />
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline-danger align-self-start"
-                onClick={() => removeEquipo(idx)}
-              >
-                <FontAwesomeIcon icon={faTrashCan} />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            className="btn btn-outline-primary"
-            onClick={addEquipo}
-          >
-            <FontAwesomeIcon icon={faCirclePlus} /> Agregar Equipo
-          </button>
         </div>
 
         {/* Notas y preferencias */}

@@ -3,10 +3,10 @@ import Usuarios from "../pages/Usuarios/Usuarios";
 import Empleados from "../pages/Empleados/Empleados";
 import Clientes from "../pages/Clientes/Clientes";
 import RegisterTest from "../pages/RegisterTest/RegisterTest";
-import OrdenesTrabajo from "../pages/OrdenesTrabajo/OrdenesTrabajo";
 import Cotizaciones from "../pages/Cotizaciones/Cotizaciones";
 import RegistroCotizaciones from "../pages/Cotizaciones/RegistroCotizaciones";
-import RegistroOrdenesTrabajo from "../pages/OrdenesTrabajo/RegistroOrdenesTrabajo";
+import OrdenesTrabajo from "../pages/OrdenesTrabajo/ListOrdenesTrabajo";
+import RegistroOrdenServicio from "../pages/OrdenesTrabajo/RegistroOrdenServicio";
 // import EquipoFotosUploader from "../pages/test/Test";
 // import OrdenesIndustrialRest from "../pages/OrdenesIndustrial/OrdenesIndustrial.tst";
 // import FormularioOrdenServicio from "../pages/OrdenesTrabajo/OrdenesTest";
@@ -58,8 +58,13 @@ const configRouting = [
     roles: ["ADMIN", "MANAGER", "TECNICO"],
   },
   {
+    path: "/registro-ordenes-servicio",
+    page: RegistroOrdenServicio,
+    roles: ["ADMIN", "MANAGER", "TECNICO"],
+  },
+  {
     path: "/ordenesTrabajo",
-    page: RegistroOrdenesTrabajo,
+    page: OrdenesTrabajo,
     roles: ["ADMIN", "MANAGER", "TECNICO"],
   },
 ];

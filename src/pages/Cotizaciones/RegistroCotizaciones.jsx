@@ -373,8 +373,9 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
           <textarea
             className="form-control"
             rows={6}
-            readOnly
+            name="leyendaFinal"
             value={formData.leyendaFinal}
+            onChange={handleFormChange}
           />
         </div>
 

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { obtenerClientes } from "../../services/clientesService";
+import React, { useEffect, useState, useMemo } from "react";
+import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -7,242 +7,193 @@ import {
   faPenSquare,
   faSearch,
   faTrashCan,
-  faListUl,
 } from "@fortawesome/free-solid-svg-icons";
 import RegistroClientes from "./Registro.clientes";
 import EliminarCliente from "./Eliminacion.clientes";
 import BasicModal from "../../components/BasicModal/BasicModal";
+import { obtenerClientes } from "../../services/clientesService";
 
-const Clientes = () => {
+export default function Clientes() {
   const [clientes, setClientes] = useState([]);
-  const [cargando, setCargando] = useState(true);
-  const [filtroBusqueda, setFiltroBusqueda] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [filterText, setFilterText] = useState("");
 
+  // Modal state
   const [showModal, setShowModal] = useState(false);
-  const [content, setContent] = useState(null);
-  const [titleModal, setTitleModal] = useState("");
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalContent, setModalContent] = useState(null);
 
-  // Estado y handlers para el modal de equipos
-  const [showEquiposModal, setShowEquiposModal] = useState(false);
-  const [equiposList, setEquiposList] = useState([]);
-
-  const abrirModalRegistro = (content, editar) => {
-    setShowModal(true);
-    setContent(content);
-    setTitleModal(!editar ? "Registro de Cliente" : "Editar Cliente");
-  };
-
-  const abrirModalEliminar = (content) => {
-    setShowModal(true);
-    setContent(content);
-    setTitleModal("Eliminar Cliente");
-  };
-
-  const abrirModalEquipos = (equipos) => {
-    setEquiposList(equipos);
-    setShowEquiposModal(true);
-  };
-
-  const cargarClientes = async () => {
-    try {
-      const response = await obtenerClientes();
-      setClientes(response);
-    } catch (error) {
-      console.error("Error al obtener los clientes: ", error);
-      toast.error("Error al obtener los clientes");
-    } finally {
-      setCargando(false);
-    }
-  };
-
+  // Fetch clientes (re-run when modal closes to refresh list)
   useEffect(() => {
-    cargarClientes();
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await obtenerClientes();
+        setClientes(data);
+      } catch {
+        toast.error("Error al cargar clientes");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [showModal]);
 
-  const clientesFiltrados = clientes.filter((c) => {
-    const term = filtroBusqueda.trim().toLowerCase();
-    if (!term) return true;
-    const fullName =
-      `${c.nombre} ${c.apellidoPaterno} ${c.apellidoMaterno}`.toLowerCase();
+  // Columns definition without invalid DOM props
+  const columns = useMemo(
+    () => [
+      {
+        name: "Nombre completo",
+        selector: (row) =>
+          [row.nombre, row.apellidoPaterno, row.apellidoMaterno]
+            .filter(Boolean)
+            .join(" "),
+        sortable: true,
+      },
+      {
+        name: "Teléfono",
+        selector: (row) => row.telefono || "-",
+        sortable: true,
+      },
+      {
+        name: "Dirección",
+        selector: (row) => row.direccion || "-",
+        sortable: true,
+        // control width instead of `grow`
+        minWidth: "200px",
+      },
+      {
+        name: "Estado",
+        selector: (row) => row.estado,
+        sortable: true,
+      },
+      {
+        name: "Acciones",
+        cell: (row) => (
+          <>
+            <button
+              className="btn btn-outline-primary btn-sm me-1"
+              onClick={() => {
+                setModalTitle("Editar Cliente");
+                setModalContent(
+                  <RegistroClientes cliente={row} setShowModal={setShowModal} />
+                );
+                setShowModal(true);
+              }}
+            >
+              <FontAwesomeIcon icon={faPenSquare} />
+            </button>
+            <button
+              className="btn btn-outline-danger btn-sm"
+              onClick={() => {
+                setModalTitle("Eliminar Cliente");
+                setModalContent(
+                  <EliminarCliente
+                    cliente={row}
+                    onDeleteSuccess={() => setShowModal(false)}
+                    onCancel={() => setShowModal(false)}
+                  />
+                );
+                setShowModal(true);
+              }}
+            >
+              <FontAwesomeIcon icon={faTrashCan} />
+            </button>
+          </>
+        ),
+        ignoreRowClick: true,
+        // allow overflow of the buttons
+        style: { overflow: "visible" },
+      },
+    ],
+    []
+  );
+
+  // Filtered data
+  const filteredItems = clientes.filter((c) => {
+    const term = filterText.toLowerCase();
+    const fullName = [c.nombre, c.apellidoPaterno, c.apellidoMaterno]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return (
       fullName.includes(term) ||
-      (c.direccion || "").toLowerCase().includes(term) ||
-      (c.telefono || "").toLowerCase().includes(term)
+      (c.telefono || "").includes(term) ||
+      (c.direccion || "").toLowerCase().includes(term)
     );
   });
 
-  return (
-    <div className="container py-4">
-      <div className="card shadow-sm">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Clientes</h5>
-          <button
-            className="btn btn-success btn-sm"
-            onClick={() =>
-              abrirModalRegistro(
-                <RegistroClientes setShowModal={setShowModal} />
-              )
-            }
-          >
-            <FontAwesomeIcon icon={faCirclePlus} /> Registrar Cliente
-          </button>
-        </div>
-
-        <div className="input-group mb-3">
+  // Subheader: search + "Nuevo" button
+  const SubHeaderComponent = useMemo(
+    () => (
+      <div className="d-flex w-100 align-items-center">
+        <div className="input-group me-2">
           <span className="input-group-text">
             <FontAwesomeIcon icon={faSearch} />
           </span>
           <input
             type="text"
-            className="form-control"
-            placeholder="Buscar por nombre, dirección o teléfono..."
-            value={filtroBusqueda}
-            onChange={(e) => setFiltroBusqueda(e.target.value)}
+            className="form-control form-control-sm"
+            placeholder="Buscar..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
           />
         </div>
+        <button
+          className="btn btn-success btn-sm"
+          onClick={() => {
+            setModalTitle("Registrar Cliente");
+            setModalContent(<RegistroClientes setShowModal={setShowModal} />);
+            setShowModal(true);
+          }}
+        >
+          <FontAwesomeIcon icon={faCirclePlus} /> Nuevo
+        </button>
+      </div>
+    ),
+    [filterText]
+  );
 
-        <div className="card-body">
-          {cargando ? (
-            <div className="text-center">
-              <div className="spinner-border" role="status">
-                <span className="visually-hidden">Cargando...</span>
-              </div>
-            </div>
-          ) : clientesFiltrados.length > 0 ? (
-            <table className="table table-bordered align-middle">
-              <thead className="table-light">
-                <tr>
-                  <th>Nombre completo</th>
-                  <th>Teléfono</th>
-                  <th>Dirección</th>
-                  <th>Equipos</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesFiltrados.map((cliente) => (
-                  <tr key={cliente._id}>
-                    <td>
-                      {[
-                        cliente.nombre,
-                        cliente.apellidoPaterno,
-                        cliente.apellidoMaterno,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    </td>
-                    <td>{cliente.telefono || "-"}</td>
-                    <td>{cliente.direccion || "-"}</td>
-                    <td className="text-center">
-                      {cliente.equipos.length > 0 ? (
-                        <button
-                          className="btn btn-outline-secondary btn-sm"
-                          onClick={() => abrirModalEquipos(cliente.equipos)}
-                        >
-                          <FontAwesomeIcon icon={faListUl} />{" "}
-                          {cliente.equipos.length}
-                        </button>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>{cliente.estado}</td>
-                    <td>
-                      <button
-                        className="btn btn-outline-primary btn-sm me-1"
-                        onClick={() =>
-                          abrirModalRegistro(
-                            <RegistroClientes
-                              cliente={cliente}
-                              setShowModal={setShowModal}
-                            />,
-                            true
-                          )
-                        }
-                      >
-                        <FontAwesomeIcon icon={faPenSquare} />
-                      </button>
-                      <button
-                        className="btn btn-outline-danger btn-sm"
-                        onClick={() =>
-                          abrirModalEliminar(
-                            <EliminarCliente
-                              cliente={cliente}
-                              onDeleteSuccess={() => {
-                                setShowModal(false);
-                                cargarClientes();
-                              }}
-                              onCancel={() => setShowModal(false)}
-                            />
-                          )
-                        }
-                      >
-                        <FontAwesomeIcon icon={faTrashCan} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="alert alert-warning">
-              No hay clientes registrados.
-            </div>
-          )}
+  // Custom table styles adding borders
+  const customStyles = useMemo(
+    () => ({
+      table: { style: { border: "1px solid #dee2e6" } },
+      headRow: { style: { borderBottom: "1px solid #dee2e6" } },
+      rows: { style: { borderBottom: "1px solid #dee2e6" } },
+      pagination: { style: { borderTop: "1px solid #dee2e6" } },
+    }),
+    []
+  );
+
+  return (
+    <div className="container py-4">
+      <div className="card shadow-sm">
+        <div className="card-body p-0">
+          <DataTable
+            title="Clientes"
+            columns={columns}
+            data={filteredItems}
+            progressPending={loading}
+            pagination
+            paginationPerPage={10}
+            paginationRowsPerPageOptions={[10, 15, 20]}
+            subHeader
+            subHeaderComponent={SubHeaderComponent}
+            persistTableHead
+            highlightOnHover
+            responsive
+            customStyles={customStyles}
+          />
         </div>
       </div>
 
-      {/* Modal de Registro/Edición/Eliminación */}
       <BasicModal
         show={showModal}
         setShow={setShowModal}
-        title={titleModal}
+        title={modalTitle}
         size="lg"
       >
-        {content}
-      </BasicModal>
-
-      {/* Modal de Equipos */}
-      <BasicModal
-        show={showEquiposModal}
-        setShow={setShowEquiposModal}
-        title="Equipos del cliente"
-        size="md"
-      >
-        <div className="list-group">
-          {equiposList.map((eq, idx) => (
-            <div key={idx} className="list-group-item">
-              <h6 className="mb-1">
-                {eq.tipo} — {eq.marca} {eq.modelo} (S/N:{" "}
-                {eq.numeroSerie || "N/A"})
-              </h6>
-              {eq.fotos && eq.fotos.length > 0 ? (
-                <div className="d-flex flex-wrap">
-                  {eq.fotos.map((url, i) => (
-                    <img
-                      key={i}
-                      src={url}
-                      alt={`Equipo ${idx} Foto ${i + 1}`}
-                      className="me-2 mb-2"
-                      style={{
-                        width: "100px",
-                        height: "100px",
-                        objectFit: "cover",
-                        borderRadius: "4px",
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <small className="text-muted">Sin fotos</small>
-              )}
-            </div>
-          ))}
-        </div>
+        {modalContent}
       </BasicModal>
     </div>
   );
-};
-
-export default Clientes;
+}

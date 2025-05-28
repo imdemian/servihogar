@@ -36,6 +36,17 @@ export async function obtenerCotizaciones() {
 }
 
 /**
+ * Obtener cotizaciones pendientes (estado "pendiente")
+ * @returns {Promise<Array>} lista de cotizaciones con estado pendiente
+ */
+export async function obtenerCotizacionesPendientes() {
+  const headers = await authHeaders();
+  // Llamamos al mismo endpoint y filtramos en frontend
+  const { data } = await axios.get(`${BASE}/cotizaciones`, { headers });
+  return data.filter((cotizacion) => cotizacion.estado === "pendiente");
+}
+
+/**
  * Obtener una cotización por ID
  * @param {string} id
  * @returns {Promise<Object>}
