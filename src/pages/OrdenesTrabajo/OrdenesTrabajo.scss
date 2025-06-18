@@ -1,0 +1,25 @@
+.servicios-equipos-content {
+  .content-title {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  .content-section {
+    margin-bottom: 1rem;
+    .section-title {
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+    .item-list {
+      padding-left: 1.25rem;
+      li {
+        margin-bottom: 0.25rem;
+      }
+    }
+  }
+  .no-items {
+    font-style: italic;
+    color: #666;
+  }
+}
