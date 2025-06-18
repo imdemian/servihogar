@@ -1,4 +1,4 @@
-// src/pages/RegisterTest/RegisterTest.jsx
+// src/pages/RegistroUsuarios/RegisterTest.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -11,7 +11,7 @@ const BASE = import.meta.env.DEV
       import.meta.env.VITE_FIREBASE_PROJECT_ID
     }.cloudfunctions.net/api`;
 
-export default function RegisterTest() {
+export default function RegistroUsuarios() {
   const [form, setForm] = useState({
     email: "",
     password: "",

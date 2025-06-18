@@ -1,3 +1,4 @@
+// src/pages/OrdenesTrabajo.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
@@ -10,11 +11,11 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import AddServicios from "./mods/addServicios";
-import BasicModal from "../../components/BasicModal/BasicModal";
-import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
 import DetalleOrdenTrabajo from "./DetalleOrdenTrabajo";
 import RegistroOrdenServicio from "./RegistroOrdenServicio";
 import FinalizarOrden from "./mods/finalizarOrden";
+import BasicModal from "../../components/BasicModal/BasicModal";
+import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
 
 export default function OrdenesTrabajo() {
   const [ordenes, setOrdenes] = useState([]);
@@ -26,6 +27,7 @@ export default function OrdenesTrabajo() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
 
+  // (Re)carga las órdenes al montar y cada vez que se cierra el modal
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -82,7 +84,6 @@ export default function OrdenesTrabajo() {
         sortable: true,
         center: true,
       },
-
       {
         name: "Status",
         sortable: true,
@@ -106,10 +107,11 @@ export default function OrdenesTrabajo() {
       },
       {
         name: "Acciones",
+        ignoreRowClick: true,
+        style: { overflow: "visible" },
         cell: (row) => (
           <>
-            {/* Solo muestro “Cambiar Status” si NO está PAGADA ni REVISADA */}
-            {row.status == "CREADA" && (
+            {row.status === "CREADA" && (
               <button
                 className="btn btn-outline-secondary btn-sm me-1"
                 onClick={() => {
@@ -127,10 +129,8 @@ export default function OrdenesTrabajo() {
                 <FontAwesomeIcon icon={faListCheck} />
               </button>
             )}
-
-            {/* El “Ver detalle” siempre */}
             <button
-              className="btn btn-outline-primary btn-sm"
+              className="btn btn-outline-primary btn-sm me-1"
               onClick={() => {
                 setModalTitle(`Información Orden: ${row.folio}`);
                 setModalContent(<DetalleOrdenTrabajo orden={row} />);
@@ -139,17 +139,15 @@ export default function OrdenesTrabajo() {
             >
               <FontAwesomeIcon icon={faEye} />
             </button>
-
-            {/* Solo muestro “Finalizar Orden” si está PAGADA */}
             {row.status === "SERVICIO" && (
               <button
-                className="btn btn-outline-success btn-sm ms-1"
+                className="btn btn-outline-success btn-sm"
                 onClick={() => {
                   setModalTitle("Finalizar Orden de Trabajo");
                   setModalContent(
                     <FinalizarOrden
                       orden={row}
-                      setShowModal={setShowModal}
+                      onClose={() => setShowModal(false)}
                       onUpdated={() => setShowModal(false)}
                     />
                   );
@@ -161,21 +159,23 @@ export default function OrdenesTrabajo() {
             )}
           </>
         ),
-        ignoreRowClick: true,
-        style: { overflow: "visible" },
       },
     ],
     []
   );
 
-  const filteredItems = ordenes.filter((o) => {
-    const term = filterText.toLowerCase();
-    return (
-      o.folio.toLowerCase().includes(term) ||
-      o.cliente.nombre.toLowerCase().includes(term) ||
-      o.status.toLowerCase().includes(term)
-    );
-  });
+  const filteredItems = useMemo(
+    () =>
+      ordenes.filter((o) => {
+        const term = filterText.toLowerCase();
+        return (
+          o.folio.toLowerCase().includes(term) ||
+          o.cliente.nombre.toLowerCase().includes(term) ||
+          o.status.toLowerCase().includes(term)
+        );
+      }),
+    [ordenes, filterText]
+  );
 
   const SubHeaderComponent = useMemo(
     () => (
@@ -197,10 +197,7 @@ export default function OrdenesTrabajo() {
           onClick={() => {
             setModalTitle("Registrar Orden de Trabajo");
             setModalContent(
-              <RegistroOrdenServicio
-                setShowModal={setShowModal}
-                onSaved={() => setShowModal(false)}
-              />
+              <RegistroOrdenServicio setShowModal={setShowModal} />
             );
             setShowModal(true);
           }}
@@ -244,6 +241,7 @@ export default function OrdenesTrabajo() {
         </div>
       </div>
 
+      {/* al cerrar, dispara recarga en useEffect */}
       <BasicModal
         show={showModal}
         setShow={setShowModal}

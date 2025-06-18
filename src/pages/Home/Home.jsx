@@ -1,118 +1,247 @@
-// src/pages/Dashboard.jsx
+// src/pages/Home.jsx
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import DataTable from "react-data-table-component";
+import { toast } from "react-toastify";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faEye,
+  faListCheck,
+  faMoneyBill,
+} from "@fortawesome/free-solid-svg-icons";
+
 import BasicModal from "../../components/BasicModal/BasicModal";
-import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
+import { obtenerOrdenesTrabajoPendientes } from "../../services/ordenesTrabajoService";
 import { obtenerCotizacionesPendientes } from "../../services/cotizacionService";
-import "./Home.scss";
 import RegistroClientes from "../Clientes/Registro.clientes";
 import RegistroOrdenServicio from "../OrdenesTrabajo/RegistroOrdenServicio";
 import RegistroCotizaciones from "../Cotizaciones/RegistroCotizaciones";
+import DetalleOrdenTrabajo from "../OrdenesTrabajo/DetalleOrdenTrabajo";
+import AddServicios from "../OrdenesTrabajo/mods/addServicios";
+import FinalizarOrden from "../OrdenesTrabajo/mods/finalizarOrden";
+import VerEquiposServicios from "../OrdenesTrabajo/mods/verEquiposServicios";
+import "./Home.scss";
 
-const Home = () => {
+export default function Home() {
   const [ordenesServicio, setOrdenesServicio] = useState([]);
   const [cotizacionesPendientes, setCotizacionesPendientes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actualizado, setActualizado] = useState(false);
 
-  // Estado genérico para el modal
-  const [modalConfig, setModalConfig] = useState({
-    show: false,
-    title: "",
-    content: null,
-  });
+  // Estados del modal
+  const [showModal, setShowModal] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalContent, setModalContent] = useState(null);
+  const [modalSize, setModalSize] = useState("md");
 
-  const openModal = ({ title, content }) => {
-    setModalConfig({ show: true, title, content });
-  };
-
-  const closeModal = () => {
-    setModalConfig({ show: false, title: "", content: null });
-  };
-
-  // Funciones para abrir formularios en modal
-  const abrirRegistrarCliente = () =>
-    openModal({
-      title: "Registrar Cliente",
-      content: <RegistroClientes setShowModal={closeModal} />,
-    });
-  const abrirRegistrarOrden = () =>
-    openModal({
-      title: "Registrar Orden de Servicio",
-      content: <RegistroOrdenServicio setShowModal={closeModal} />,
-    });
-  const abrirCrearFactura = () =>
-    openModal({
-      title: "Crear Factura",
-      content: <RegistroCotizaciones setShowModal={closeModal} />,
-    });
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const ordenes = await obtenerOrdenesTrabajo(["creada", "en servicio"]);
-        const cotizaciones = await obtenerCotizacionesPendientes();
-        setOrdenesServicio(ordenes);
-        setCotizacionesPendientes(cotizaciones);
-      } catch (error) {
-        console.error("Error cargando datos del dashboard", error);
-      } finally {
-        setLoading(false);
-      }
+  // Función para cargar datos
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const ordenes = await obtenerOrdenesTrabajoPendientes([
+        "creada",
+        "en servicio",
+      ]);
+      const cotizaciones = await obtenerCotizacionesPendientes();
+      setOrdenesServicio(ordenes);
+      setCotizacionesPendientes(cotizaciones);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error cargando datos");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Carga inicial
+  useEffect(() => {
     fetchData();
   }, []);
 
+  // 2) Vuelve a cargar siempre que cambie `actualizado`
+  useEffect(() => {
+    if (actualizado) {
+      fetchData();
+      // Reseteamos para que no se quede “true” permanentemente
+      setActualizado(false);
+    }
+  }, [actualizado]);
+
+  // Abrir modal genérico
+  const openModal = ({ title, content, size = "md" }) => {
+    setModalTitle(title);
+    setModalContent(content);
+    setModalSize(size);
+    setShowModal(true);
+  };
+
+  // Función para abrir el modal de agragar servicios
+
+  const closeModal = () => setShowModal(false);
+
+  // Acciones para abrir distintos modales
+  const abrirRegistrarCliente = () =>
+    openModal({
+      title: "Registrar Cliente",
+      content: (
+        <RegistroClientes
+          onClose={closeModal}
+          setActualizado={setActualizado}
+          setShowModal={setShowModal}
+        />
+      ),
+      size: "lg",
+    });
+
+  const abrirRegistrarOrden = () =>
+    openModal({
+      title: "Registrar Orden de Servicio",
+      content: (
+        <RegistroOrdenServicio
+          onClose={closeModal}
+          setShowModal={setShowModal}
+          setActualizado={setActualizado}
+        />
+      ),
+      size: "lg",
+    });
+
+  const abrirCrearCotizacion = () =>
+    openModal({
+      title: "Crear Cotización",
+      content: (
+        <RegistroCotizaciones
+          onClose={closeModal}
+          setActualizado={setActualizado}
+          setShowModal={setShowModal}
+        />
+      ),
+      size: "lg",
+    });
+
+  const abrirVerServicios = (orden) =>
+    openModal({
+      title: `Servicios & Equipos - ${orden.folio}`,
+      content: (
+        <VerEquiposServicios
+          folio={orden.folio}
+          servicios={orden.servicios || []}
+          equipos={orden.equipos || []}
+        />
+      ),
+      size: "sm",
+    });
+
+  // Columnas de órdenes
   const columnsOrdenes = [
     { name: "Folio", selector: (row) => row.folio, sortable: true },
-    { name: "Cliente", selector: (row) => row.cliente.nombre, sortable: true },
     {
-      name: "Servicio",
+      name: "Cliente",
+      selector: (row) => row.cliente?.nombre || "-",
       sortable: true,
-      cell: (row) => {
-        const serviciosRaw = row.servicios;
-        if (!serviciosRaw) return <span className="text-muted">-</span>;
-        const servicios = Array.isArray(serviciosRaw)
-          ? serviciosRaw
-          : [serviciosRaw];
-        if (servicios.length === 1) {
-          const single = servicios[0];
-          return <span>{single.servicio || single}</span>;
-        }
-        // Abrir modal genérico con lista de servicios
-        const list = (
-          <ul className="list-unstyled mb-0">
-            {servicios.map((srv, idx) => (
-              <li key={idx}>{srv.servicio || srv}</li>
-            ))}
-          </ul>
-        );
-        return (
-          <button
-            className="btn btn-sm btn-link p-0"
-            onClick={() => openModal({ title: "Servicios", content: list })}
-          >
-            Ver ({servicios.length})
-          </button>
-        );
-      },
     },
-    { name: "Status", selector: (row) => row.status, sortable: true },
+    {
+      name: "Ver servicios",
+      cell: (row) => (
+        <button
+          className="btn btn-outline-secondary btn-sm"
+          onClick={() => abrirVerServicios(row)}
+        >
+          Ver servicios
+        </button>
+      ),
+      ignoreRowClick: true,
+    },
+    {
+      name: "Acciones",
+      ignoreRowClick: true,
+      style: { overflow: "visible" },
+      cell: (row) => (
+        <>
+          {row.status === "CREADA" && (
+            <button
+              className="btn btn-outline-secondary btn-sm me-1"
+              onClick={() =>
+                openModal({
+                  title: "Servicios / Cambiar Status",
+                  content: (
+                    <AddServicios
+                      orden={row}
+                      onClose={closeModal}
+                      onUpdated={closeModal}
+                      setActualizado={setActualizado}
+                      setShowModal={setShowModal}
+                    />
+                  ),
+                  size: "lg",
+                })
+              }
+            >
+              <FontAwesomeIcon icon={faListCheck} />
+            </button>
+          )}
+          <button
+            className="btn btn-outline-primary btn-sm me-1"
+            onClick={() =>
+              openModal({
+                title: `Detalle Orden: ${row.folio}`,
+                content: <DetalleOrdenTrabajo orden={row} />,
+                size: "lg",
+              })
+            }
+          >
+            <FontAwesomeIcon icon={faEye} />
+          </button>
+          {row.status === "SERVICIO" && (
+            <button
+              className="btn btn-outline-success btn-sm"
+              onClick={() =>
+                openModal({
+                  title: "Finalizar Orden",
+                  content: (
+                    <FinalizarOrden
+                      orden={row}
+                      onClose={closeModal}
+                      setActualizado={setActualizado}
+                      setShowModal={setShowModal}
+                    />
+                  ),
+                  size: "lg",
+                })
+              }
+            >
+              <FontAwesomeIcon icon={faMoneyBill} />
+            </button>
+          )}
+        </>
+      ),
+    },
+    { name: "Status", selector: (row) => row.status || "-", sortable: true },
     {
       name: "Fecha",
-      selector: (row) => new Date(row.fecha).toLocaleDateString(),
+      selector: (row) =>
+        row.fechaRecepcion
+          ? new Date(row.fechaRecepcion).toLocaleDateString()
+          : "-",
       sortable: true,
     },
   ];
 
+  // Columnas de cotizaciones
   const columnsCotizaciones = [
     { name: "ID", selector: (row) => row.id, sortable: true },
-    { name: "Cliente", selector: (row) => row.clienteNombre, sortable: true },
-    { name: "Total", selector: (row) => `$${row.total?.toFixed(2)}` },
+    {
+      name: "Cliente",
+      selector: (row) => row.clienteNombre || "-",
+      sortable: true,
+    },
+    {
+      name: "Total",
+      selector: (row) => (row.total != null ? `$${row.total.toFixed(2)}` : "-"),
+    },
     {
       name: "Fecha",
-      selector: (row) => new Date(row.fecha).toLocaleDateString(),
+      selector: (row) =>
+        row.fecha ? new Date(row.fecha).toLocaleDateString() : "-",
       sortable: true,
     },
   ];
@@ -120,23 +249,19 @@ const Home = () => {
   if (loading) return <p>Cargando datos...</p>;
 
   return (
-    <div>
-      {/* Barra de acciones */}
+    <div className="dashboard-container">
       <div className="dashboard-toolbar">
         <button
-          onClick={() => abrirRegistrarCliente()}
-          className="btn btn-primary"
+          className="btn btn-primary me-2"
+          onClick={abrirRegistrarCliente}
         >
           Registrar Cliente
         </button>
-        <button
-          onClick={() => abrirRegistrarOrden()}
-          className="btn btn-primary"
-        >
-          Registrar Orden de Servicio
+        <button className="btn btn-primary me-2" onClick={abrirRegistrarOrden}>
+          Registrar Orden
         </button>
-        <button onClick={() => abrirCrearFactura()} className="btn btn-primary">
-          Crear Factura
+        <button className="btn btn-primary" onClick={abrirCrearCotizacion}>
+          Crear Cotización
         </button>
       </div>
 
@@ -163,19 +288,15 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Modal de servicios */}
-      {/* Modal genérico */}
       <BasicModal
-        show={modalConfig.show}
+        show={showModal}
+        setShow={setShowModal}
         onClose={closeModal}
-        title={modalConfig.title}
-        size={modalConfig.size || "md"}
-        setShow={closeModal}
+        title={modalTitle}
+        size={modalSize}
       >
-        {modalConfig.content}
+        {modalContent}
       </BasicModal>
     </div>
   );
-};
-
-export default Home;
+}

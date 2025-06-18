@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { obtenerUsuarios } from "../../services/usuariosService";
 import BasicModal from "../../components/BasicModal/BasicModal";
-import RegistroUsuarios from "./registro.usuarios";
 import "./Usuarios.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -12,6 +11,7 @@ import {
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { obtenerEmpleados } from "../../services/empleadosService";
+import RegistroUsuarios from "../RegisterTest/RegisterTest";
 
 const Usuarios = () => {
   // Estado para la lista de usuarios, empleados, loading, filtro

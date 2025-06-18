@@ -7,7 +7,7 @@ import { faPlusCircle, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { generateUniqueFolio } from "../../utils/folioUtils";
 
-const RegistroOrdenServicio = ({ onSaved }) => {
+const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
   const [clientes, setClientes] = useState([]);
   const [empleados, setEmpleados] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -151,10 +151,13 @@ const RegistroOrdenServicio = ({ onSaved }) => {
       });
       setSearchTerm("");
       setShowSuggestions(false);
-      onSaved && onSaved();
+      setShowModal(false);
     } catch (err) {
       console.error(err);
       toast.error("No se pudo registrar la orden");
+    } finally {
+      setActualizado((prev) => !prev);
+      setShowModal(false);
     }
   };
 

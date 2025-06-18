@@ -1,10 +1,10 @@
 // src/components/EliminarEmpleado.jsx
 import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
+import { eliminarEmpleado } from "../../services/empleadosService";
 // Asegúrate de que la función eliminarEmpleado esté definida en tu servicio
-import { eliminarEmpleado } from "../../services/functions/empleados/empleados.functions";
 
-const EliminarEmpleado = ({ empleado, onCancel, onDeleteSuccess }) => {
+const EliminarEmpleado = ({ empleado, setShow }) => {
   // Inicializamos los datos del empleado que se mostrarán (campos deshabilitados)
   const [formData, setFormData] = useState({
     nombre: empleado?.nombre || "",
@@ -39,10 +39,10 @@ const EliminarEmpleado = ({ empleado, onCancel, onDeleteSuccess }) => {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const response = await eliminarEmpleado(empleado._id);
+      const response = await eliminarEmpleado(empleado.id);
       if (response.data && response.data.success) {
         toast.success("Empleado eliminado con éxito");
-        if (onDeleteSuccess) onDeleteSuccess();
+        setShow(false); // Cierra el modal o componente
       }
     } catch (error) {
       const msg =
@@ -147,14 +147,7 @@ const EliminarEmpleado = ({ empleado, onCancel, onDeleteSuccess }) => {
             className="form-control"
           />
         </div>
-        <div className="d-flex justify-content-between">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onCancel}
-          >
-            Cancelar
-          </button>
+        <div className="d-flex justify-content-center">
           <button type="submit" className="btn btn-danger" disabled={loading}>
             {loading ? "Eliminando..." : "Eliminar Empleado"}
           </button>

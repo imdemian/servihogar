@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import BasicModal from "../../../components/BasicModal/BasicModal";
 import { obtenerEmpleados } from "../../../services/empleadosService";
 
-const AddServicios = ({ orden, onClose, onUpdated }) => {
+const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
   console.log(orden);
 
   const [datosOrden, setDatosOrden] = useState({
@@ -32,21 +32,16 @@ const AddServicios = ({ orden, onClose, onUpdated }) => {
   );
 
   useEffect(() => {
-    // Cargar empleados si no se pasaron como props
-    if (orden.empleados && orden.empleados.length > 0) {
-      setEmpleados(orden.empleados);
-    } else {
-      const fetchEmpleados = async () => {
-        try {
-          const response = await obtenerEmpleados();
-          setEmpleados(response);
-        } catch (err) {
-          console.error("Error al cargar empleados:", err);
-          toast.error("Error al cargar empleados");
-        }
-      };
-      fetchEmpleados();
-    }
+    const fetchEmpleados = async () => {
+      try {
+        const response = await obtenerEmpleados();
+        setEmpleados(response);
+      } catch (err) {
+        console.error("Error al cargar empleados:", err);
+        toast.error("Error al cargar empleados");
+      }
+    };
+    fetchEmpleados();
   }, [orden]);
 
   console.log(empleados);
@@ -157,12 +152,11 @@ const AddServicios = ({ orden, onClose, onUpdated }) => {
       };
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success("Orden actualizada a EN SERVICIO");
-      onUpdated && onUpdated();
+      setShowModal(false);
+      setActualizado(true);
     } catch (err) {
       console.error(err);
       toast.error("Error al actualizar orden");
-    } finally {
-      onClose();
     }
   };
 
@@ -186,13 +180,13 @@ const AddServicios = ({ orden, onClose, onUpdated }) => {
       };
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success(`Orden actualizada y pagada con ${method}`);
-      onUpdated && onUpdated();
+      setShowPayModal(false);
+      setShowModal(false);
+      setActualizado(true);
+      onClose();
     } catch (err) {
       console.error(err);
       toast.error("Error al actualizar orden");
-    } finally {
-      setShowPayModal(false);
-      onClose();
     }
   };
 
@@ -417,6 +411,7 @@ const AddServicios = ({ orden, onClose, onUpdated }) => {
         {datosOrden.status !== "CREADA" && (
           <div className="mb-3 text-end">
             <button
+              disabled={!datosOrden.empleados.length}
               type="button"
               className="btn btn-warning me-2"
               onClick={() => setShowPayModal(true)}
@@ -462,7 +457,8 @@ const AddServicios = ({ orden, onClose, onUpdated }) => {
             value={entregadoPor}
             onChange={(e) => setEntregadoPor(e.target.value)}
           >
-            {datosOrden.empleados.map((emp) => (
+            <option value="">-- Selecciona empleado --</option>
+            {empleados.map((emp) => (
               <option key={emp.id} value={emp.id}>
                 {emp.nombre} {emp.apellidoPaterno}
               </option>

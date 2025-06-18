@@ -11,7 +11,11 @@ import { obtenerEmpleados } from "../../../services/empleadosService";
  * @param {() => void} props.onUpdated    — callback tras guardar cambios.
  * @param {(show: boolean) => void} props.setShowModal — para cerrar el modal.
  */
-export default function FinalizarOrden({ orden, onUpdated, setShowModal }) {
+export default function FinalizarOrden({
+  orden,
+  setShowModal,
+  setActualizado,
+}) {
   const [empleadosEmpresa, setEmpleadosEmpresa] = useState([]);
   const [responsableId, setResponsableId] = useState("");
 
@@ -49,12 +53,11 @@ export default function FinalizarOrden({ orden, onUpdated, setShowModal }) {
       };
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success(`Orden ${payload.status} y pagada con ${method}`);
-      onUpdated && onUpdated();
+      setActualizado(true);
+      setShowModal(false);
     } catch (err) {
       console.error(err);
       toast.error("Error al actualizar la orden");
-    } finally {
-      setShowModal(false);
     }
   };
 

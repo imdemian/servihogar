@@ -30,15 +30,15 @@ const Sidebar = () => {
   // Items principales
   const menuItems = [
     { title: "Inicio", route: "/home", icon: faHome },
-    { title: "Usuarios", route: "/usuarios", icon: faUsers },
-    { title: "Clientes", route: "/clientes", icon: faPeopleGroup },
-    { title: "Empleados", route: "/empleados", icon: faUserTie },
     {
       title: "Órdenes de Trabajo",
       route: "/ordenesTrabajo",
       icon: faNoteSticky,
     },
     { title: "Cotizaciones", route: "/cotizaciones", icon: faMoneyBill1 },
+    { title: "Clientes", route: "/clientes", icon: faPeopleGroup },
+    { title: "Empleados", route: "/empleados", icon: faUserTie },
+    { title: "Usuarios", route: "/usuarios", icon: faUsers },
   ];
 
   // Items inferiores (solo Salir necesita logout)

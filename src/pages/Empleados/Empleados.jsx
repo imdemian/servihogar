@@ -10,6 +10,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import RegistroEmpleados from "./Registro.empleados";
+import EliminarEmpleado from "./Eliminacion.empleado";
 
 const Empleados = () => {
   // Estado para la lista de empleados
@@ -27,6 +28,12 @@ const Empleados = () => {
     setShowModal(true);
     setContent(content);
     setTitleModal(!editar ? "Registro de Empleado" : "Editar Empleado");
+  };
+
+  const abrirModalEliminar = (content) => {
+    setShowModal(true);
+    setContent(content);
+    setTitleModal("Eliminar Empleado");
   };
 
   // Función para cargar los empelados desde el backend
@@ -133,7 +140,17 @@ const Empleados = () => {
                         >
                           <FontAwesomeIcon icon={faPenSquare} />
                         </button>
-                        <button className="btn btn-outline-danger btn-sm">
+                        <button
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => {
+                            abrirModalEliminar(
+                              <EliminarEmpleado
+                                empleado={empleado}
+                                setShowModal={setShowModal}
+                              />
+                            );
+                          }}
+                        >
                           <FontAwesomeIcon icon={faTrashCan} />
                         </button>
                       </td>

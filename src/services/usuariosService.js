@@ -2,7 +2,15 @@
 import axios from "axios";
 import { getIdTokenForUser } from "./authService";
 
-const BASE = import.meta.env.DEV
+// Leemos la nueva variable que acabamos de definir en .env.local:
+const FORCE_DEV = import.meta.env.VITE_FORCE_DEV === "true";
+
+// Si FORCE_DEV es false, omitimos el emulador aunque estemos en modo DEV de Vite:
+const USE_EMULATOR = import.meta.env.DEV && FORCE_DEV;
+
+// Base URL de tus Functions: emulador en DEV, Cloud en prod
+// Construimos la URL base:
+const BASE = USE_EMULATOR
   ? import.meta.env.VITE_FUNCTIONS_EMULATOR_URL
   : `https://us-central1-${
       import.meta.env.VITE_FIREBASE_PROJECT_ID
