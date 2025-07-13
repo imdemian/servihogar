@@ -1,170 +1,149 @@
-import React, { useState, useEffect } from "react";
-import { toast } from "react-toastify";
-import { obtenerUsuarios } from "../../services/usuariosService";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import BasicModal from "../../components/BasicModal/BasicModal";
-import "./Usuarios.scss";
+import { obtenerUsuarios } from "../../services/usuariosService";
+import DataTable from "react-data-table-component";
+import RegistroUsuario from "./Registro.Usuario";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faCirclePlus,
-  faPenSquare,
-  faSearch,
-  faTrashCan,
-} from "@fortawesome/free-solid-svg-icons";
-import { obtenerEmpleados } from "../../services/empleadosService";
-import RegistroUsuarios from "../RegisterTest/RegisterTest";
+import { faPen, faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import EliminarUsuario from "./Eliminar.Usuario";
 
 const Usuarios = () => {
-  // Estado para la lista de usuarios, empleados, loading, filtro
   const [usuarios, setUsuarios] = useState([]);
-  const [empleados, setEmpleados] = useState([]);
-  const [cargando, setCargando] = useState(true);
-  const [filtroBusqueda, setFiltroBusqueda] = useState("");
 
-  // Propiedades para el modal
+  //Propiedades del modal
   const [showModal, setShowModal] = useState(false);
-  const [modalContent, setModalContent] = useState(null);
   const [modalTitle, setModalTitle] = useState("");
+  const [contentModal, setContentModal] = useState(null);
+  const [size, setSize] = useState("lg");
 
-  // Abrir el modal para registrar un nuevo usuario
-  const abrirModalRegistro = (content, editar) => {
+  // Función para abrir el modal para registrar un usuario
+  const registrarUsuarios = (content) => {
+    setContentModal(content);
+    setModalTitle("Registrar Usuario");
+    setSize("md");
     setShowModal(true);
-    setModalContent(content);
-    setModalTitle(!editar ? "Registro de Usuario" : "Editar Usuario");
   };
 
-  // Carga usuarios y empleados
-  const cargarDatos = async () => {
-    setCargando(true);
+  // Función para abrir el modal para editar un usuario
+  const handleEdit = (content) => {
+    setContentModal(content);
+    setModalTitle("Editar Usuario");
+    setSize("md");
+    setShowModal(true);
+  };
+
+  const handleDelete = useCallback(
+    (usuario) => {
+      setContentModal(
+        <EliminarUsuario usuario={usuario} setShow={setShowModal} />
+      );
+      setModalTitle("Eliminar Usuario");
+      setSize("md");
+      setShowModal(true);
+    },
+    [setContentModal, setModalTitle, setSize, setShowModal]
+  );
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, [showModal]);
+
+  const cargarUsuarios = async () => {
     try {
-      const [respUsuarios, respEmpleados] = await Promise.all([
-        obtenerUsuarios(),
-        obtenerEmpleados(),
-      ]);
-      console.log(respUsuarios, respEmpleados);
-      setUsuarios(respUsuarios);
-      setEmpleados(respEmpleados);
+      let data = await obtenerUsuarios(); // Asegúrate de tener esta función definida
+      let lista = Array.isArray(data)
+        ? data
+        : Array.isArray(data.usuarios)
+        ? data.usuarios
+        : Array.isArray(data.data)
+        ? data.data
+        : Object.values(data);
+      setUsuarios(lista);
     } catch (error) {
-      console.error("Error al obtener datos:", error);
-      toast.error("Error al cargar usuarios ó empleados");
-    } finally {
-      setCargando(false);
+      console.error("Error al cargar usuarios:", error);
+      setUsuarios([]);
     }
   };
 
-  useEffect(() => {
-    cargarDatos();
-  }, [showModal]);
-
-  const usuariosFiltrados = usuarios.filter((u) =>
-    u.nombre.toLowerCase().includes(filtroBusqueda.toLowerCase())
+  const columns = useMemo(
+    () => [
+      {
+        name: "User",
+        selector: (row) => row.email,
+        sortable: true,
+      },
+      {
+        name: "Nombre",
+        selector: (row) => row.nombre,
+        sortable: true,
+      },
+      {
+        name: "Rol",
+        selector: (row) => row.rol,
+        sortable: true,
+      },
+      {
+        name: "Empleado",
+        selector: (row) => row.empleado?.id || "N/A",
+        sortable: true,
+      },
+      {
+        name: "Acciones",
+        cell: (row) => (
+          <div className="d-flex justify-content-around">
+            <button
+              className="btn btn-sm btn-primary me-2"
+              onClick={() =>
+                handleEdit(
+                  <RegistroUsuario usuario={row} setShow={setShowModal} />
+                )
+              }
+            >
+              <FontAwesomeIcon icon={faPen} />
+            </button>
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={() => handleDelete(row)}
+            >
+              <FontAwesomeIcon icon={faTrashCan} />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [handleDelete]
   );
 
-  // Helper para encontrar el nombre completo del empleado
-  const nombreEmpleado = (empleadoId) => {
-    const e = empleados.find((emp) => emp._id === empleadoId);
-    return e ? `${e.nombre} ${e.apellidoPaterno}` : "-";
-  };
-
   return (
-    <div className="container py-4">
-      {/* Card con la tabla de usuarios */}
-      <div className="card shadow-sm">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Usuarios</h5>
-          <button
-            className="btn btn-success btn-sm"
-            onClick={() =>
-              abrirModalRegistro(
-                <RegistroUsuarios setShowModal={setShowModal} />
-              )
-            }
-          >
-            <FontAwesomeIcon icon={faCirclePlus} className="me-1" />
-            Agregar usuario
-          </button>
-        </div>
-
-        <div className="input-group mb-3">
-          <span className="input-group-text">
-            <FontAwesomeIcon icon={faSearch} />
-          </span>
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Buscar usuario..."
-            value={filtroBusqueda}
-            onChange={(e) => setFiltroBusqueda(e.target.value)}
-          />
-        </div>
-
-        <div className="card-body">
-          {cargando ? (
-            <div>Cargando...</div>
-          ) : usuariosFiltrados.length > 0 ? (
-            <table className="table table-bordered align-middle">
-              <thead className="table-light">
-                <tr>
-                  <th>Usuario</th>
-                  <th>Nombre</th>
-                  <th>Empleado</th>
-                  <th>Rol</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usuariosFiltrados.map((usuario) => (
-                  <tr key={usuario._id}>
-                    <td>{usuario.email}</td>
-                    <td>{usuario.nombre || "-"}</td>
-                    <td>
-                      {usuario.empleadoId
-                        ? nombreEmpleado(usuario.empleadoId)
-                        : ""}
-                    </td>
-                    <td>{usuario.rol}</td>
-                    {/* Aquí puedes agregar más campos según tu modelo de usuario */}
-                    <td>
-                      <button
-                        className="btn btn-sm btn-outline-danger me-2"
-                        // onClick={() => eliminarUsuario(usuario._id)}
-                      >
-                        <FontAwesomeIcon icon={faTrashCan} />
-                      </button>
-                      <button
-                        className="btn btn-sm btn-outline-primary"
-                        onClick={() =>
-                          abrirModalRegistro(
-                            <RegistroUsuarios
-                              usuario={usuario}
-                              setShowModal={setShowModal}
-                            />,
-                            true
-                          )
-                        }
-                      >
-                        <FontAwesomeIcon icon={faPenSquare} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="alert alert-warning">
-              No hay usuarios registrados.
-            </div>
-          )}
-        </div>
+    <div className="container mt-4">
+      <div className="mb-3 d-flex justify-content-between align-items-center">
+        <h1>Usuarios</h1>
+        <button
+          className="btn btn-primary"
+          onClick={() =>
+            registrarUsuarios(
+              <RegistroUsuario usuario={null} setShow={setShowModal} />
+            )
+          }
+        >
+          Registrar Usuario
+        </button>
       </div>
 
-      {/* Modal para registrar usuario */}
+      <DataTable
+        columns={columns}
+        data={usuarios}
+        pagination
+        highlightOnHover
+        responsive
+      />
       <BasicModal
         show={showModal}
         setShow={setShowModal}
         title={modalTitle}
-        size="lg"
+        size={size || "lg"}
       >
-        {modalContent}
+        {contentModal}
       </BasicModal>
     </div>
   );

@@ -11,7 +11,7 @@ const BASE = import.meta.env.DEV
       import.meta.env.VITE_FIREBASE_PROJECT_ID
     }.cloudfunctions.net/api`;
 
-export default function RegistroUsuarios() {
+export default function RegisterTest() {
   const [form, setForm] = useState({
     email: "",
     password: "",

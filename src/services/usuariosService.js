@@ -58,7 +58,8 @@ export async function actualizarUsuario(id, u) {
 }
 
 export async function eliminarUsuario(id) {
-  await axios.delete(`${BASE}/usuarios/${id}`);
+  const { data } = await axios.delete(`${BASE}/usuarios/${id}`);
+  return data;
 }
 
 export async function changePassword(id, payload) {

@@ -152,8 +152,9 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
       };
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success("Orden actualizada a EN SERVICIO");
-      setShowModal(false);
+
       setActualizado(true);
+      setShowModal(false);
     } catch (err) {
       console.error(err);
       toast.error("Error al actualizar orden");
@@ -180,10 +181,10 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
       };
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success(`Orden actualizada y pagada con ${method}`);
+
+      setActualizado(true);
       setShowPayModal(false);
       setShowModal(false);
-      setActualizado(true);
-      onClose();
     } catch (err) {
       console.error(err);
       toast.error("Error al actualizar orden");
