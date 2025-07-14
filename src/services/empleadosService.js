@@ -60,6 +60,6 @@ export async function actualizarOrdenesAsignadas(id, ordenesAsignadas) {
 
 export async function eliminarEmpleado(id) {
   const headers = await authHeaders();
-  await axios.delete(`${BASE}/empleados/${id}`, { headers });
-  return { success: true };
+  const response = await axios.delete(`${BASE}/empleados/${id}`, { headers });
+  return response;
 }

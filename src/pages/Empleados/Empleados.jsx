@@ -9,8 +9,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import BasicModal from "../../components/BasicModal/BasicModal";
-import RegistroEmpleados from "./Registro.empleados";
-import EliminarEmpleado from "./Eliminacion.empleado";
+import RegistroEmpleado from "./Registro.Empleado";
+import EliminarEmpleado from "./Eliminar.Empleado";
 
 const Empleados = () => {
   // Estado para la lista de empleados
@@ -68,7 +68,7 @@ const Empleados = () => {
             className="btn btn-success btn-sm"
             onClick={() =>
               abrirModalRegistro(
-                <RegistroEmpleados setShowModal={setShowModal} />
+                <RegistroEmpleado setShowModal={setShowModal} />
               )
             }
           >
@@ -105,14 +105,13 @@ const Empleados = () => {
                     <th>Nombre</th>
                     <th>Teléfono</th>
                     <th>Dirección</th>
-                    <th>Ordenes Asignadas</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {empleadosFiltrados.map((empleado) => (
-                    <tr key={empleado._id}>
+                    <tr key={empleado.id}>
                       <td>
                         {empleado.nombre +
                           " " +
@@ -122,7 +121,6 @@ const Empleados = () => {
                       </td>
                       <td>{empleado.telefono || "-"}</td>
                       <td>{empleado.direccion || "-"}</td>
-                      <td>{empleado.ordenesAsignadas || "-"}</td>
                       <td>{empleado.estado ? "activo" : "inactivo"}</td>
                       <td>
                         {/* Aquí puedes agregar botones para editar o eliminar */}
@@ -130,7 +128,7 @@ const Empleados = () => {
                           className="btn btn-outline-primary btn-sm me-1"
                           onClick={() =>
                             abrirModalRegistro(
-                              <RegistroEmpleados
+                              <RegistroEmpleado
                                 empleado={empleado}
                                 setShowModal={setShowModal}
                               />,
@@ -146,7 +144,7 @@ const Empleados = () => {
                             abrirModalEliminar(
                               <EliminarEmpleado
                                 empleado={empleado}
-                                setShowModal={setShowModal}
+                                setShow={setShowModal}
                               />
                             );
                           }}

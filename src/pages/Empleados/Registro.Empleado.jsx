@@ -6,11 +6,7 @@ import {
   actualizarEmpleado,
 } from "../../services/empleadosService";
 
-const RegistroEmpleados = ({
-  empleado,
-  setRefreshCheckLogin,
-  setShowModal,
-}) => {
+const RegistroEmpleado = ({ empleado, setRefreshCheckLogin, setShowModal }) => {
   // Inicializa formData usando los datos del empleado en modo edición (si existe), o valores vacíos para registro.
   const [formData, setFormData] = useState({
     nombre: empleado?.nombre || "",
@@ -19,7 +15,6 @@ const RegistroEmpleados = ({
     telefono: empleado?.telefono || "",
     direccion: empleado?.direccion || "",
     fechaContratacion: empleado?.fechaContratacion || "",
-    ordenesAsignadas: empleado?.ordenesAsignadas || [],
   });
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -27,14 +22,27 @@ const RegistroEmpleados = ({
   // Actualiza el formData si llega un empleado (modo edición)
   useEffect(() => {
     if (empleado) {
+      let fechaStr = "";
+
+      if (empleado.fechaContratacion?.seconds) {
+        fechaStr = new Date(empleado.fechaContratacion.seconds * 1000)
+          .toISOString()
+          .split("T")[0];
+      } else if (
+        typeof empleado.fechaContratacion === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(empleado.fechaContratacion)
+      ) {
+        fechaStr = empleado.fechaContratacion;
+      }
+
       setFormData({
         nombre: empleado.nombre || "",
         apellidoPaterno: empleado.apellidoPaterno || "",
         apellidoMaterno: empleado.apellidoMaterno || "",
         telefono: empleado.telefono || "",
         direccion: empleado.direccion || "",
-        fechaContratacion: empleado.fechaContratacion || "",
-        ordenesAsignadas: empleado.ordenesAsignadas || [],
+        tiendaId: empleado.tiendaId || "",
+        fechaContratacion: fechaStr,
       });
     }
   }, [empleado]);
@@ -54,13 +62,13 @@ const RegistroEmpleados = ({
       let response;
       if (empleado) {
         // Modo edición: Actualizar el empleado. Se asume que el empleado tiene una propiedad _id.
-        response = await actualizarEmpleado(empleado._id, formData);
+        response = await actualizarEmpleado(empleado.id, formData);
       } else {
         // Modo registro: Crear un nuevo empleado.
         response = await registrarEmpleado(formData);
       }
 
-      if (response.data && response.data.success) {
+      if (response) {
         // Mostrar mensaje de éxito según el modo
         toast.success(
           empleado
@@ -76,8 +84,8 @@ const RegistroEmpleados = ({
             apellidoMaterno: "",
             telefono: "",
             direccion: "",
+            tiendaId: "",
             fechaContratacion: "",
-            ordenesAsignadas: [],
           });
         }
       }
@@ -216,4 +224,4 @@ const RegistroEmpleados = ({
   );
 };
 
-export default RegistroEmpleados;
+export default RegistroEmpleado;

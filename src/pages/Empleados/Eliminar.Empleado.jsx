@@ -40,11 +40,13 @@ const EliminarEmpleado = ({ empleado, setShow }) => {
     setLoading(true);
     try {
       const response = await eliminarEmpleado(empleado.id);
-      if (response.data && response.data.success) {
+      console.log(response);
+      if (response.data.success) {
         toast.success("Empleado eliminado con éxito");
         setShow(false); // Cierra el modal o componente
       }
     } catch (error) {
+      console.log(error);
       const msg =
         error.response?.data?.message ||
         "Error al eliminar el empleado. Inténtalo de nuevo.";

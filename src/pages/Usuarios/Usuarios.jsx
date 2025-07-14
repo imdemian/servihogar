@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import { obtenerUsuarios } from "../../services/usuariosService";
 import DataTable from "react-data-table-component";
-import RegistroUsuario from "./Registro.Usuario";
+import RegistroUsuarios from "./registro.usuarios";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import EliminarUsuario from "./Eliminar.Usuario";
@@ -95,7 +95,7 @@ const Usuarios = () => {
               className="btn btn-sm btn-primary me-2"
               onClick={() =>
                 handleEdit(
-                  <RegistroUsuario usuario={row} setShow={setShowModal} />
+                  <RegistroUsuarios usuario={row} setShow={setShowModal} />
                 )
               }
             >
@@ -122,7 +122,7 @@ const Usuarios = () => {
           className="btn btn-primary"
           onClick={() =>
             registrarUsuarios(
-              <RegistroUsuario usuario={null} setShow={setShowModal} />
+              <RegistroUsuarios usuario={null} setShow={setShowModal} />
             )
           }
         >
