@@ -67,7 +67,17 @@ export function generateCotizacionPdf(cotizacion) {
     y,
     { align: "right" }
   );
-  y += 20;
+  y += 30;
+
+  // — Descripción de la cotización —
+  if (cotizacion.leyendaCotizacion) {
+    const descripcion = doc.splitTextToSize(
+      cotizacion.leyendaCotizacion,
+      pageWidth - margin * 2
+    );
+    doc.text(descripcion, margin, y);
+    y += descripcion.length * 14 + 10;
+  }
 
   // — Preparo datos para la tabla con formato MXN —
   const headers = ["#", "Descripción", "Capacidad", "Cant.", "Unit.", "Total"];
@@ -139,7 +149,7 @@ export function generateCotizacionPdf(cotizacion) {
       pageWidth - margin * 2
     );
     doc.text(leyenda, margin, y);
-    y += leyenda.length * 14 + 10;
+    y += leyenda.length * 14 + 20;
   }
 
   // — Términos finales —

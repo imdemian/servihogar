@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
 import { actualizarCotizacion } from "../../services/cotizacionService";
+import { toast } from "react-toastify";
 
-export default function CambioStatusCot({ cotizacion, onSaved }) {
+export default function CambioStatusCot({ cotizacion, setShow }) {
   const { nombreCliente, items = [], total, status: inicial } = cotizacion;
   const [status, setStatus] = useState(inicial);
 
@@ -17,7 +18,7 @@ export default function CambioStatusCot({ cotizacion, onSaved }) {
       });
       console.log(response);
       if (response.status === 200) {
-        console.log("Estado de la cotización actualizado:", response.data);
+        toast.success("Estado de cotización actualizado correctamente");
       } else {
         console.error(
           "Error al actualizar el estado de la cotización:",
@@ -27,7 +28,7 @@ export default function CambioStatusCot({ cotizacion, onSaved }) {
     } catch (error) {
       console.error("Error al cambiar el estado de la cotización:", error);
     } finally {
-      onSaved();
+      setShow(false);
     }
   };
 
@@ -75,14 +76,22 @@ export default function CambioStatusCot({ cotizacion, onSaved }) {
         >
           Rechazada
         </button>
-        <button
-          className={`btn btn-outline-success${
-            status === "APROBADA" ? " active" : ""
-          }`}
-          onClick={() => handleClick("APROBADA")}
-        >
-          Aprobada
-        </button>
+        {status !== "APROBADA" ? (
+          <button
+            className="btn btn-outline-success"
+            onClick={() => handleClick("APROBADA")}
+          >
+            Aprobar
+          </button>
+        ) : (
+          <button
+            className="btn btn-outline-primary"
+            onClick={() => handleClick("PAGADA")}
+          >
+            Pagada
+          </button>
+        )}
+
         <button
           className={`btn btn-outline-secondary${
             status === "PENDIENTE" ? " active" : ""

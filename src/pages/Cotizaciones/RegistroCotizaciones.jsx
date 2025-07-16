@@ -1,22 +1,16 @@
 import React, { useEffect, useState } from "react";
 import logo from "../../assets/logoServiHogar.png";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faTrash } from "@fortawesome/free-solid-svg-icons";
 import {
   actualizarCotizacion,
   registrarCotizacion,
 } from "../../services/cotizacionService";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
 import BasicModal from "../../components/BasicModal/BasicModal";
+import { useNavigate } from "react-router-dom";
 
-const formDataNotas = {
-  instPieEquipo: "Se solicita instalación eléctrica a pie de equipo.",
-  materialesInstalacion:
-    "Si se requiere de materiales o instalaciones especiales adicionales estos se cotizarán por separado.",
-};
-
-const RegistroCotizaciones = ({ initialData, onSaved }) => {
+const RegistroCotizaciones = ({ initialData, onSaved, setShow }) => {
   const navigate = useNavigate();
 
   // Valores por defecto
@@ -88,14 +82,7 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
     const fieldValue = type === "checkbox" ? checked : value;
-    const updated = { ...formData, [name]: fieldValue };
-    if (name === "instPieChecked" || name === "matInstChecked") {
-      let text = "";
-      if (updated.instPieChecked) text += formDataNotas.instPieEquipo + "\n";
-      if (updated.matInstChecked) text += formDataNotas.materialesInstalacion;
-      updated.leyendaFinal = text.trim();
-    }
-    setFormData(updated);
+    setFormData({ ...formData, [name]: fieldValue });
   };
 
   const handleItemChange = (idx, field, value) => {
@@ -143,6 +130,8 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
         toast.success("Cotización actualizada");
       } else {
         await registrarCotizacion(payload);
+        if (setShow) setShow(false);
+        else navigate("/cotizaciones");
         toast.success("Cotización guardada");
       }
       onSaved?.(); // callback opcional para refrescar lista
@@ -151,7 +140,6 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
       toast.error(err.message || "Error al guardar cotización");
     } finally {
       setSaving(false);
-      navigate("/cotizaciones");
     }
   };
 
@@ -163,6 +151,16 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
         onSubmit={handleSubmit}
       >
         <div className="d-flex align-items-center mb-4">
+          {!initialData && !setShow && (
+            <button
+              className="btn btn-primary me-3"
+              type="button"
+              onClick={() => navigate("/cotizaciones")}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+            </button>
+          )}
+
           <img
             src={logo}
             alt="Logo CRM"
@@ -338,34 +336,6 @@ const RegistroCotizaciones = ({ initialData, onSaved }) => {
         >
           + Añadir producto/servicio
         </button>
-
-        {/* CHECKS LEYENDAS */}
-        <div className="mb-3">
-          <div className="form-check">
-            <input
-              type="checkbox"
-              className="form-check-input"
-              name="instPieChecked"
-              checked={formData.instPieChecked}
-              onChange={handleFormChange}
-            />
-            <label className="form-check-label">
-              {formDataNotas.instPieEquipo}
-            </label>
-          </div>
-          <div className="form-check">
-            <input
-              type="checkbox"
-              className="form-check-input"
-              name="matInstChecked"
-              checked={formData.matInstChecked}
-              onChange={handleFormChange}
-            />
-            <label className="form-check-label">
-              {formDataNotas.materialesInstalacion}
-            </label>
-          </div>
-        </div>
 
         {/* LEYENDA FINAL */}
         <div className="mb-4">

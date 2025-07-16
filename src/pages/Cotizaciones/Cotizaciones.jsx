@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerCotizaciones } from "../../services/cotizacionService";
+import {
+  obtenerCotizaciones,
+  eliminarCotizacion,
+} from "../../services/cotizacionService";
 import { toast } from "react-toastify";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import RegistroCotizaciones from "./RegistroCotizaciones";
@@ -9,9 +12,11 @@ import {
   faFileArrowDown,
   faListCheck,
   faPen,
+  faTrash,
 } from "@fortawesome/free-solid-svg-icons";
 import CambioStatusCot from "./CambioStatusCot";
 import { generateCotizacionPdf } from "../../services/pdfs/cotPDFgen";
+import { AuthContext } from "../../utils/context";
 
 export default function ListadoCotizaciones() {
   const [cotizaciones, setCotizaciones] = useState([]);
@@ -19,31 +24,38 @@ export default function ListadoCotizaciones() {
   const [activeTab, setActiveTab] = useState("pendientes");
   const navigate = useNavigate();
 
-  // Propiedades del modal
+  // ✅ Traer rol del usuario desde contexto
+  const { userRole } = useContext(AuthContext);
+
+  // Modal
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
 
-  // 1) Extraemos la carga en una función reutilizable
   const loadCotizaciones = async () => {
     setLoading(true);
     try {
-      const data = await obtenerCotizaciones();
-      setCotizaciones(data);
+      const response = await obtenerCotizaciones();
+      setCotizaciones(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error(err);
       toast.error("Error al cargar cotizaciones");
+      setCotizaciones([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadCotizaciones();
-  }, []);
-
   const byStatus = (status) =>
-    cotizaciones.filter((c) => c.status === status.toUpperCase());
+    Array.isArray(cotizaciones)
+      ? cotizaciones.filter((c) => c.status === status.toUpperCase())
+      : [];
+
+  useEffect(() => {
+    if (!showModal) {
+      loadCotizaciones();
+    }
+  }, [showModal]);
 
   const abrirModalEdicion = (title, content) => {
     setModalTitle(title);
@@ -63,6 +75,18 @@ export default function ListadoCotizaciones() {
     } catch (err) {
       console.error("Error al generar PDF:", err);
       toast.error("No se pudo descargar la cotización.");
+    }
+  };
+
+  const handleDelete = async (cot) => {
+    try {
+      await eliminarCotizacion(cot.id);
+      toast.success("Cotización eliminada");
+      loadCotizaciones();
+      setShowModal(false);
+    } catch (err) {
+      console.error("Error al eliminar:", err);
+      toast.error("No se pudo eliminar la cotización");
     }
   };
 
@@ -99,7 +123,6 @@ export default function ListadoCotizaciones() {
                                 setShowModal={setShowModal}
                                 onSaved={() => {
                                   setShowModal(false);
-                                  // aquí podrías recargar lista, limpiar selectedCot, etc.
                                   loadCotizaciones();
                                 }}
                               />
@@ -116,11 +139,7 @@ export default function ListadoCotizaciones() {
                               "Cambiar status",
                               <CambioStatusCot
                                 cotizacion={cot}
-                                setShowModal={setShowModal}
-                                onSaved={() => {
-                                  setShowModal(false);
-                                  loadCotizaciones();
-                                }}
+                                setShow={setShowModal}
                               />
                             );
                           }}
@@ -134,6 +153,39 @@ export default function ListadoCotizaciones() {
                         >
                           <FontAwesomeIcon icon={faFileArrowDown} />
                         </button>
+
+                        {userRole === "ADMIN" && (
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => {
+                              abrirModalEdicion(
+                                "Confirmar eliminación",
+                                <>
+                                  <p>
+                                    ¿Estás seguro de eliminar la cotización{" "}
+                                    <strong>{cot.noCotizacion}</strong>?
+                                  </p>
+                                  <div className="d-flex justify-content-end">
+                                    <button
+                                      className="btn btn-secondary me-2"
+                                      onClick={() => setShowModal(false)}
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      className="btn btn-danger"
+                                      onClick={() => handleDelete(cot)}
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </>
+                              );
+                            }}
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -210,7 +262,6 @@ export default function ListadoCotizaciones() {
         </div>
       )}
 
-      {/* 2) Modal de edición */}
       <BasicModal show={showModal} setShow={setShowModal} title={modalTitle}>
         {modalContent}
       </BasicModal>

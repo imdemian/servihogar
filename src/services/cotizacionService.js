@@ -36,10 +36,10 @@ async function authHeaders() {
  */
 export async function obtenerCotizaciones() {
   const headers = await authHeaders();
-  const { data } = await axios.get(`${BASE}/cotizaciones`, {
+  const response = await axios.get(`${BASE}/cotizaciones`, {
     headers,
   });
-  return data;
+  return response;
 }
 
 /**
@@ -50,7 +50,7 @@ export async function obtenerCotizacionesPendientes() {
   const headers = await authHeaders();
   // Llamamos al mismo endpoint y filtramos en frontend
   const { data } = await axios.get(`${BASE}/cotizaciones`, { headers });
-  return data.filter((cotizacion) => cotizacion.estado === "pendiente");
+  return data.filter((cotizacion) => cotizacion.status === "PENDIENTE");
 }
 
 /**
@@ -87,10 +87,10 @@ export async function registrarCotizacion(payload) {
  */
 export async function actualizarCotizacion(id, payload) {
   const headers = await authHeaders();
-  const { data } = await axios.put(`${BASE}/cotizaciones/${id}`, payload, {
+  const response = await axios.put(`${BASE}/cotizaciones/${id}`, payload, {
     headers,
   });
-  return data;
+  return response;
 }
 
 /**

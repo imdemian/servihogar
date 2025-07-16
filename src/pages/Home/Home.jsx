@@ -4,6 +4,7 @@ import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCheck,
   faEye,
   faListCheck,
   faMoneyBill,
@@ -20,12 +21,12 @@ import AddServicios from "../OrdenesTrabajo/mods/addServicios";
 import FinalizarOrden from "../OrdenesTrabajo/mods/finalizarOrden";
 import VerEquiposServicios from "../OrdenesTrabajo/mods/verEquiposServicios";
 import "./Home.scss";
+import CambioStatusCot from "../Cotizaciones/CambioStatusCot";
 
 export default function Home() {
   const [ordenesServicio, setOrdenesServicio] = useState([]);
   const [cotizacionesPendientes, setCotizacionesPendientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actualizado, setActualizado] = useState(false);
 
   // Estados del modal
   const [showModal, setShowModal] = useState(false);
@@ -52,19 +53,11 @@ export default function Home() {
     }
   };
 
-  // Carga inicial
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  // 2) Vuelve a cargar siempre que cambie `actualizado`
-  useEffect(() => {
-    if (actualizado) {
+    if (!showModal) {
       fetchData();
-      // Reseteamos para que no se quede “true” permanentemente
-      setActualizado(false);
     }
-  }, [actualizado]);
+  }, [showModal]);
 
   // Abrir modal genérico
   const openModal = ({ title, content, size = "md" }) => {
@@ -83,11 +76,7 @@ export default function Home() {
     openModal({
       title: "Registrar Cliente",
       content: (
-        <RegistroClientes
-          onClose={closeModal}
-          setActualizado={setActualizado}
-          setShowModal={setShowModal}
-        />
+        <RegistroClientes onClose={closeModal} setShowModal={setShowModal} />
       ),
       size: "lg",
     });
@@ -99,7 +88,6 @@ export default function Home() {
         <RegistroOrdenServicio
           onClose={closeModal}
           setShowModal={setShowModal}
-          setActualizado={setActualizado}
         />
       ),
       size: "lg",
@@ -109,11 +97,7 @@ export default function Home() {
     openModal({
       title: "Crear Cotización",
       content: (
-        <RegistroCotizaciones
-          onClose={closeModal}
-          setActualizado={setActualizado}
-          setShowModal={setShowModal}
-        />
+        <RegistroCotizaciones onClose={closeModal} setShow={setShowModal} />
       ),
       size: "lg",
     });
@@ -168,7 +152,6 @@ export default function Home() {
                       orden={row}
                       onClose={closeModal}
                       onUpdated={closeModal}
-                      setActualizado={setActualizado}
                       setShowModal={setShowModal}
                     />
                   ),
@@ -201,7 +184,6 @@ export default function Home() {
                     <FinalizarOrden
                       orden={row}
                       onClose={closeModal}
-                      setActualizado={setActualizado}
                       setShowModal={setShowModal}
                     />
                   ),
@@ -228,10 +210,13 @@ export default function Home() {
 
   // Columnas de cotizaciones
   const columnsCotizaciones = [
-    { name: "ID", selector: (row) => row.id, sortable: true },
+    { name: "No.", selector: (row) => row.noCotizacion, sortable: true },
     {
       name: "Cliente",
-      selector: (row) => row.clienteNombre || "-",
+      selector: (row) =>
+        row.tituloCliente && row.nombreCliente
+          ? `${row.tituloCliente} ${row.nombreCliente}`
+          : row.nombreCliente || "-",
       sortable: true,
     },
     {
@@ -241,8 +226,31 @@ export default function Home() {
     {
       name: "Fecha",
       selector: (row) =>
-        row.fecha ? new Date(row.fecha).toLocaleDateString() : "-",
+        row.fechaCotizacion
+          ? new Date(row.fechaCotizacion).toLocaleDateString()
+          : "-",
       sortable: true,
+    },
+    {
+      name: "Acciones",
+      cell: (row) => (
+        <>
+          <button
+            className="btn btn-outline-success btn-sm"
+            onClick={() =>
+              openModal({
+                title: "Aceptar Cotización",
+                content: (
+                  <CambioStatusCot cotizacion={row} setShow={setShowModal} />
+                ),
+                size: "lg",
+              })
+            }
+          >
+            <FontAwesomeIcon icon={faCheck} />
+          </button>
+        </>
+      ),
     },
   ];
 
