@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { actualizarOrdenTrabajo } from "../../../services/ordenesTrabajoService";
 import { uploadFiles } from "../../../services/storageService";
 import { toast } from "react-toastify";
@@ -6,9 +6,12 @@ import { faPlusCircle, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import BasicModal from "../../../components/BasicModal/BasicModal";
 import { obtenerEmpleados } from "../../../services/empleadosService";
+import { AuthContext } from "../../../utils/context";
 
-const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
+const AddServicios = ({ orden, onClose, setShowModal }) => {
   console.log(orden);
+
+  const { userRole } = useContext(AuthContext);
 
   const [datosOrden, setDatosOrden] = useState({
     cliente: orden.cliente,
@@ -130,11 +133,6 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
 
   // Click en Actualizar Orden
   const handleUpdateClick = async () => {
-    if (datosOrden.status === "REVISADA") {
-      setShowPayModal(true);
-      return;
-    }
-    // Estado distinto, actualizar a SERVICIO directamente
     try {
       let urls = datosOrden.fotos;
       if (nuevasFotos.length) {
@@ -144,16 +142,27 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
         );
         urls = [...urls, ...uploaded];
       }
+
       const payload = {
         ...datosOrden,
         fotos: urls,
-        status: "SERVICIO",
         total: costoTotalOrden,
       };
-      await actualizarOrdenTrabajo(orden.id, payload);
-      toast.success("Orden actualizada a EN SERVICIO");
 
-      setActualizado(true);
+      // Si no es MANAGER ni ADMIN, es un PRE-SERVICIO
+      if (userRole !== "MANAGER" && userRole !== "ADMIN") {
+        payload.status = "PRE-SERVICIO";
+        payload.servicios = datosOrden.servicios.map((s) => ({
+          ...s,
+          precioUnitario: 0,
+          total: 0,
+        }));
+      } else {
+        payload.status = "SERVICIO";
+      }
+
+      await actualizarOrdenTrabajo(orden.id, payload);
+      toast.success(`Orden actualizada a ${payload.status}`);
       setShowModal(false);
     } catch (err) {
       console.error(err);
@@ -182,7 +191,6 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
       await actualizarOrdenTrabajo(orden.id, payload);
       toast.success(`Orden actualizada y pagada con ${method}`);
 
-      setActualizado(true);
       setShowPayModal(false);
       setShowModal(false);
     } catch (err) {
@@ -234,6 +242,7 @@ const AddServicios = ({ orden, onClose, setActualizado, setShowModal }) => {
                     className="form-control form-control-sm"
                     value={s.precioUnitario}
                     onChange={(e) => handleServiceChange(idx, e)}
+                    disabled={userRole !== "ADMIN"}
                   />
                 </td>
                 <td>

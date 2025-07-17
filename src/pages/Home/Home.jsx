@@ -1,9 +1,10 @@
 // src/pages/Home.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faArrowsToEye,
   faCheck,
   faEye,
   faListCheck,
@@ -11,8 +12,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import BasicModal from "../../components/BasicModal/BasicModal";
-import { obtenerOrdenesTrabajoPendientes } from "../../services/ordenesTrabajoService";
-import { obtenerCotizacionesPendientes } from "../../services/cotizacionService";
 import RegistroClientes from "../Clientes/Registro.clientes";
 import RegistroOrdenServicio from "../OrdenesTrabajo/RegistroOrdenServicio";
 import RegistroCotizaciones from "../Cotizaciones/RegistroCotizaciones";
@@ -20,46 +19,28 @@ import DetalleOrdenTrabajo from "../OrdenesTrabajo/DetalleOrdenTrabajo";
 import AddServicios from "../OrdenesTrabajo/mods/addServicios";
 import FinalizarOrden from "../OrdenesTrabajo/mods/finalizarOrden";
 import VerEquiposServicios from "../OrdenesTrabajo/mods/verEquiposServicios";
-import "./Home.scss";
 import CambioStatusCot from "../Cotizaciones/CambioStatusCot";
 
+import { db } from "../../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+import { AuthContext } from "../../utils/context";
+
+import "./Home.scss";
+
 export default function Home() {
+  const { user } = useContext(AuthContext);
+
   const [ordenesServicio, setOrdenesServicio] = useState([]);
   const [cotizacionesPendientes, setCotizacionesPendientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados del modal
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
   const [modalSize, setModalSize] = useState("md");
 
-  // Función para cargar datos
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const ordenes = await obtenerOrdenesTrabajoPendientes([
-        "creada",
-        "en servicio",
-      ]);
-      const cotizaciones = await obtenerCotizacionesPendientes();
-      setOrdenesServicio(ordenes);
-      setCotizacionesPendientes(cotizaciones);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error cargando datos");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const closeModal = () => setShowModal(false);
 
-  useEffect(() => {
-    if (!showModal) {
-      fetchData();
-    }
-  }, [showModal]);
-
-  // Abrir modal genérico
   const openModal = ({ title, content, size = "md" }) => {
     setModalTitle(title);
     setModalContent(content);
@@ -67,11 +48,6 @@ export default function Home() {
     setShowModal(true);
   };
 
-  // Función para abrir el modal de agragar servicios
-
-  const closeModal = () => setShowModal(false);
-
-  // Acciones para abrir distintos modales
   const abrirRegistrarCliente = () =>
     openModal({
       title: "Registrar Cliente",
@@ -115,7 +91,50 @@ export default function Home() {
       size: "sm",
     });
 
-  // Columnas de órdenes
+  // 🔁 Escuchar cambios en tiempo real
+  useEffect(() => {
+    if (!user) return;
+
+    const unsubOrdenes = onSnapshot(
+      collection(db, "ordenesTrabajo"),
+      (snapshot) => {
+        const data = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((o) =>
+            ["creada", "en servicio", "pre-servicio"].includes(
+              o.status?.toLowerCase()
+            )
+          );
+        setOrdenesServicio(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error obteniendo órdenes:", error);
+        toast.error("Error al cargar órdenes.");
+        setLoading(false);
+      }
+    );
+
+    const unsubCotizaciones = onSnapshot(
+      collection(db, "cotizaciones"),
+      (snapshot) => {
+        const data = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((c) => c.status === "PENDIENTE");
+        setCotizacionesPendientes(data);
+      },
+      (error) => {
+        console.error("Error obteniendo cotizaciones:", error);
+        toast.error("Error al cargar cotizaciones.");
+      }
+    );
+
+    return () => {
+      unsubOrdenes();
+      unsubCotizaciones();
+    };
+  }, [user]);
+
   const columnsOrdenes = [
     { name: "Folio", selector: (row) => row.folio, sortable: true },
     {
@@ -130,7 +149,7 @@ export default function Home() {
           className="btn btn-outline-secondary btn-sm"
           onClick={() => abrirVerServicios(row)}
         >
-          Ver servicios
+          <FontAwesomeIcon icon={faArrowsToEye} />
         </button>
       ),
       ignoreRowClick: true,
@@ -151,7 +170,6 @@ export default function Home() {
                     <AddServicios
                       orden={row}
                       onClose={closeModal}
-                      onUpdated={closeModal}
                       setShowModal={setShowModal}
                     />
                   ),
@@ -208,7 +226,6 @@ export default function Home() {
     },
   ];
 
-  // Columnas de cotizaciones
   const columnsCotizaciones = [
     { name: "No.", selector: (row) => row.noCotizacion, sortable: true },
     {
@@ -234,22 +251,20 @@ export default function Home() {
     {
       name: "Acciones",
       cell: (row) => (
-        <>
-          <button
-            className="btn btn-outline-success btn-sm"
-            onClick={() =>
-              openModal({
-                title: "Aceptar Cotización",
-                content: (
-                  <CambioStatusCot cotizacion={row} setShow={setShowModal} />
-                ),
-                size: "lg",
-              })
-            }
-          >
-            <FontAwesomeIcon icon={faCheck} />
-          </button>
-        </>
+        <button
+          className="btn btn-outline-success btn-sm"
+          onClick={() =>
+            openModal({
+              title: "Aceptar Cotización",
+              content: (
+                <CambioStatusCot cotizacion={row} setShow={setShowModal} />
+              ),
+              size: "lg",
+            })
+          }
+        >
+          <FontAwesomeIcon icon={faCheck} />
+        </button>
       ),
     },
   ];
