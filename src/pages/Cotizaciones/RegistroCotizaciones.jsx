@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import { useNavigate } from "react-router-dom";
 
-const RegistroCotizaciones = ({ initialData, onSaved, setShow }) => {
+const RegistroCotizaciones = ({ initialData, setShow }) => {
   const navigate = useNavigate();
 
   // Valores por defecto
@@ -134,7 +134,6 @@ const RegistroCotizaciones = ({ initialData, onSaved, setShow }) => {
         else navigate("/cotizaciones");
         toast.success("Cotización guardada");
       }
-      onSaved?.(); // callback opcional para refrescar lista
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Error al guardar cotización");

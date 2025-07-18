@@ -1,5 +1,5 @@
 // src/pages/OrdenesTrabajo.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useContext } from "react";
 import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -8,14 +8,17 @@ import {
   faListCheck,
   faEye,
   faMoneyBill,
+  faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
-
+import { db } from "../../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import AddServicios from "./mods/addServicios";
 import DetalleOrdenTrabajo from "./DetalleOrdenTrabajo";
 import RegistroOrdenServicio from "./RegistroOrdenServicio";
 import FinalizarOrden from "./mods/finalizarOrden";
 import BasicModal from "../../components/BasicModal/BasicModal";
-import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
+import { AuthContext } from "../../utils/context";
+import ConfirmarEliminacion from "./mods/confirmarEliminacion";
 
 export default function OrdenesTrabajo() {
   const [ordenes, setOrdenes] = useState([]);
@@ -27,20 +30,29 @@ export default function OrdenesTrabajo() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
 
+  const { userRole } = useContext(AuthContext);
+
   // (Re)carga las órdenes al montar y cada vez que se cierra el modal
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await obtenerOrdenesTrabajo();
+    const unsub = onSnapshot(
+      collection(db, "ordenesTrabajo"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setOrdenes(data);
-      } catch {
-        toast.error("Error al cargar órdenes de trabajo");
-      } finally {
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error al obtener órdenes:", error);
+        toast.error("Error al cargar órdenes en tiempo real");
         setLoading(false);
       }
-    })();
-  }, [showModal]);
+    );
+
+    return () => unsub(); // limpieza del listener
+  }, []);
 
   const columns = useMemo(
     () => [
@@ -157,11 +169,25 @@ export default function OrdenesTrabajo() {
                 <FontAwesomeIcon icon={faMoneyBill} />
               </button>
             )}
+            {userRole === "ADMIN" && (
+              <button
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => {
+                  setModalTitle("Confirmar Eliminación");
+                  setModalContent(
+                    <ConfirmarEliminacion orden={row} setShow={setShowModal} />
+                  );
+                  setShowModal(true);
+                }}
+              >
+                <FontAwesomeIcon icon={faTrashCan} />
+              </button>
+            )}
           </>
         ),
       },
     ],
-    []
+    [userRole]
   );
 
   const filteredItems = useMemo(

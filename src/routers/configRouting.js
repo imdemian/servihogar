@@ -7,21 +7,24 @@ import Cotizaciones from "../pages/Cotizaciones/Cotizaciones";
 import RegistroCotizaciones from "../pages/Cotizaciones/RegistroCotizaciones";
 import OrdenesTrabajo from "../pages/OrdenesTrabajo/ListOrdenesTrabajo";
 import RegistroOrdenServicio from "../pages/OrdenesTrabajo/RegistroOrdenServicio";
+import OrdenesTrabajoMobile from "../pages/OrdenesTrabajo/OrdenesTrabajoMobile";
 // import EquipoFotosUploader from "../pages/test/Test";
 // import OrdenesIndustrialRest from "../pages/OrdenesIndustrial/OrdenesIndustrial.tst";
 // import FormularioOrdenServicio from "../pages/OrdenesTrabajo/OrdenesTest";
 // import OrdenesTrabajoRegistro from "../pages/OrdenesTrabajo/OrdenesTrabajo.registro";
 
+const isMobile = window.innerWidth <= 768;
+
 const configRouting = [
   {
     path: "/",
     page: Home,
-    roles: ["ADMIN", "MANAGER", "TECNICO"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/home",
     page: Home,
-    roles: ["ADMIN", "MANAGER", "TECNICO"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/usuarios",
@@ -50,12 +53,12 @@ const configRouting = [
   {
     path: "/registro-cotizaciones",
     page: RegistroCotizaciones,
-    roles: ["ADMIN", "MANAGER", "TECNICO"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/cotizaciones",
     page: Cotizaciones,
-    roles: ["ADMIN", "MANAGER", "TECNICO"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/registro-ordenes-servicio",
@@ -64,7 +67,7 @@ const configRouting = [
   },
   {
     path: "/ordenesTrabajo",
-    page: OrdenesTrabajo,
+    page: isMobile ? OrdenesTrabajoMobile : OrdenesTrabajo,
     roles: ["ADMIN", "MANAGER", "TECNICO"],
   },
 ];

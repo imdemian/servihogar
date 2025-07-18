@@ -7,18 +7,13 @@ import { faPlusCircle, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { generateUniqueFolio } from "../../utils/folioUtils";
 
-const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
+const RegistroOrdenServicio = ({ setShowModal }) => {
   const [clientes, setClientes] = useState([]);
   const [empleados, setEmpleados] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredClientes, setFilteredClientes] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef(null);
-
-  // Inputs para equipos
-  const [equipoDescripcion, setEquipoDescripcion] = useState("");
-  const [equipoMarca, setEquipoMarca] = useState("");
-  const [equipoModelo, setEquipoModelo] = useState("");
 
   const [datosOrden, setDatosOrden] = useState({
     folio: "",
@@ -31,7 +26,7 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
       direccion: "",
     },
     descripcionFalla: "",
-    equipos: [],
+    equipos: [{ descripcion: "", marca: "", modelo: "" }],
     empleados: [],
     servicios: [{ servicio: "", precioUnitario: 0, cantidad: 1, total: 0 }],
     fechaRecepcion: "",
@@ -41,7 +36,6 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
     status: "CREADA",
   });
 
-  // Carga inicial
   useEffect(() => {
     (async () => {
       try {
@@ -55,6 +49,7 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
         console.error(err);
       }
     })();
+
     const handleClickOutside = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setShowSuggestions(false);
@@ -64,7 +59,6 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filtrar clientes
   useEffect(() => {
     const term = searchTerm.toLowerCase();
     setFilteredClientes(
@@ -76,7 +70,6 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
     );
   }, [searchTerm, clientes]);
 
-  // Seleccionar cliente
   const selectCliente = (c) => {
     setDatosOrden((prev) => ({
       ...prev,
@@ -93,35 +86,37 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
     setShowSuggestions(false);
   };
 
-  // Equipos
-  const addEquipo = () => {
-    const desc = equipoDescripcion.trim();
-    if (!desc) return;
+  const handleEquipoChange = (idx, field, value) => {
+    const nuevos = [...datosOrden.equipos];
+    nuevos[idx][field] = value;
+    setDatosOrden((prev) => ({ ...prev, equipos: nuevos }));
+  };
+
+  const handleAddEquipo = () => {
     setDatosOrden((prev) => ({
       ...prev,
-      equipos: [
-        ...prev.equipos,
-        {
-          descripcion: desc,
-          marca: equipoMarca.trim(),
-          modelo: equipoModelo.trim(),
-        },
-      ],
+      equipos: [...prev.equipos, { descripcion: "", marca: "", modelo: "" }],
     }));
-    setEquipoDescripcion("");
-    setEquipoMarca("");
-    setEquipoModelo("");
   };
-  const removeEquipo = (idx) => {
+
+  const handleRemoveEquipo = (idx) => {
     setDatosOrden((prev) => ({
       ...prev,
       equipos: prev.equipos.filter((_, i) => i !== idx),
     }));
   };
 
-  // Submit envía fechas formateadas DD-MM-YYYY
   const onSubmit = async (e) => {
     e.preventDefault();
+
+    const equiposValidos = datosOrden.equipos.filter(
+      (eq) => eq.descripcion.trim() !== ""
+    );
+    if (equiposValidos.length === 0) {
+      toast.warn("Debes agregar al menos un equipo con descripción válida.");
+      return;
+    }
+
     try {
       const folio = await generateUniqueFolio(10);
       const payload = {
@@ -141,12 +136,13 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
           direccion: "",
         },
         descripcionFalla: "",
-        equipos: [],
+        equipos: [{ descripcion: "", marca: "", modelo: "" }],
         empleados: [],
         servicios: [{ servicio: "", precioUnitario: 0, cantidad: 1, total: 0 }],
         fechaRecepcion: "",
         fechaEntrega: "",
         anticipo: 0,
+        total: 0,
         status: "CREADA",
       });
       setSearchTerm("");
@@ -156,7 +152,6 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
       console.error(err);
       toast.error("No se pudo registrar la orden");
     } finally {
-      setActualizado((prev) => !prev);
       setShowModal(false);
     }
   };
@@ -199,91 +194,72 @@ const RegistroOrdenServicio = ({ setShowModal, setActualizado }) => {
         )}
       </div>
 
-      {/* Datos cliente */}
-      {datosOrden.cliente.id && (
-        <div className="row mb-4">
-          <div className="col-md-6">
-            <label className="form-label">Teléfono</label>
-            <input
-              readOnly
-              className="form-control"
-              value={datosOrden.cliente.telefono}
-            />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Dirección</label>
-            <input
-              readOnly
-              className="form-control"
-              value={datosOrden.cliente.direccion}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Equipos */}
+      {/* Tabla de equipos */}
       <div className="mb-4">
         <label className="form-label">Equipos</label>
-        <div className="input-group mb-2">
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Descripción..."
-            value={equipoDescripcion}
-            onChange={(e) => setEquipoDescripcion(e.target.value)}
-          />
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Marca..."
-            value={equipoMarca}
-            onChange={(e) => setEquipoMarca(e.target.value)}
-          />
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Modelo..."
-            value={equipoModelo}
-            onChange={(e) => setEquipoModelo(e.target.value)}
-          />
-          <button
-            className="btn btn-outline-primary"
-            type="button"
-            onClick={addEquipo}
-          >
-            <FontAwesomeIcon icon={faPlusCircle} />
-          </button>
-        </div>
-        {datosOrden.equipos.length > 0 && (
-          <table className="table table-bordered">
-            <thead className="bg-light">
-              <tr>
-                <th>Descripción</th>
-                <th>Marca</th>
-                <th>Modelo</th>
-                <th>Acciones</th>
+        <table className="table table-bordered">
+          <thead className="bg-light">
+            <tr>
+              <th>Descripción</th>
+              <th>Marca</th>
+              <th>Modelo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {datosOrden.equipos.map((eq, idx) => (
+              <tr key={idx}>
+                <td>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={eq.descripcion}
+                    onChange={(e) =>
+                      handleEquipoChange(idx, "descripcion", e.target.value)
+                    }
+                    required
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={eq.marca}
+                    onChange={(e) =>
+                      handleEquipoChange(idx, "marca", e.target.value)
+                    }
+                  />
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={eq.modelo}
+                    onChange={(e) =>
+                      handleEquipoChange(idx, "modelo", e.target.value)
+                    }
+                  />
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    onClick={() => handleRemoveEquipo(idx)}
+                  >
+                    <FontAwesomeIcon icon={faTrashAlt} />
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {datosOrden.equipos.map((eq, idx) => (
-                <tr key={idx}>
-                  <td className="px-2 py-1">{eq.descripcion}</td>
-                  <td className="px-2 py-1">{eq.marca || "sin datos"}</td>
-                  <td className="px-2 py-1">{eq.modelo || "sin datos"}</td>
-                  <td className="px-2 py-1">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => removeEquipo(idx)}
-                    >
-                      <FontAwesomeIcon icon={faTrashAlt} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+            ))}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          onClick={handleAddEquipo}
+        >
+          <FontAwesomeIcon icon={faPlusCircle} /> Añadir Equipo
+        </button>
       </div>
 
       {/* Falla y fechas */}

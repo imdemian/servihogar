@@ -7,6 +7,8 @@ import {
 import { toast } from "react-toastify";
 import BasicModal from "../../components/BasicModal/BasicModal";
 import RegistroCotizaciones from "./RegistroCotizaciones";
+import { db } from "../../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faFileArrowDown,
@@ -52,10 +54,25 @@ export default function ListadoCotizaciones() {
       : [];
 
   useEffect(() => {
-    if (!showModal) {
-      loadCotizaciones();
-    }
-  }, [showModal]);
+    const unsub = onSnapshot(
+      collection(db, "cotizaciones"),
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setCotizaciones(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error al obtener cotizaciones:", err);
+        toast.error("Error al cargar cotizaciones en tiempo real.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsub(); // 🔁 limpia el listener al desmontar
+  }, []);
 
   const abrirModalEdicion = (title, content) => {
     setModalTitle(title);
@@ -121,10 +138,6 @@ export default function ListadoCotizaciones() {
                               <RegistroCotizaciones
                                 initialData={cot}
                                 setShowModal={setShowModal}
-                                onSaved={() => {
-                                  setShowModal(false);
-                                  loadCotizaciones();
-                                }}
                               />
                             );
                           }}
