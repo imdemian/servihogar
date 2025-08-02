@@ -101,7 +101,7 @@ export default function Home() {
         const data = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((o) =>
-            ["creada", "en servicio", "pre-servicio"].includes(
+            ["creada", "servicio", "pre-servicio"].includes(
               o.status?.toLowerCase()
             )
           );

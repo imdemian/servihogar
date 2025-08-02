@@ -132,7 +132,7 @@ export default function OrdenesTrabajo() {
                     <AddServicios
                       orden={row}
                       onClose={() => setShowModal(false)}
-                      onUpdated={() => setShowModal(false)}
+                      setShowModal={setShowModal}
                     />
                   );
                   setShowModal(true);
@@ -159,6 +159,7 @@ export default function OrdenesTrabajo() {
                   setModalContent(
                     <FinalizarOrden
                       orden={row}
+                      setShowModal={setShowModal}
                       onClose={() => setShowModal(false)}
                       onUpdated={() => setShowModal(false)}
                     />
