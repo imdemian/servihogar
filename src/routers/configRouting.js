@@ -13,7 +13,7 @@ import OrdenesTrabajoMobile from "../pages/OrdenesTrabajo/OrdenesTrabajoMobile";
 // import FormularioOrdenServicio from "../pages/OrdenesTrabajo/OrdenesTest";
 // import OrdenesTrabajoRegistro from "../pages/OrdenesTrabajo/OrdenesTrabajo.registro";
 
-const isMobile = window.innerWidth <= 768;
+const isMobile = window.innerWidth <= 1000;
 
 const configRouting = [
   {
@@ -34,6 +34,7 @@ const configRouting = [
   {
     path: "/register-test",
     page: RegisterTest,
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/empleados",
@@ -63,7 +64,7 @@ const configRouting = [
   {
     path: "/registro-ordenes-servicio",
     page: RegistroOrdenServicio,
-    roles: ["ADMIN", "MANAGER", "TECNICO"],
+    roles: ["ADMIN", "MANAGER"],
   },
   {
     path: "/ordenesTrabajo",

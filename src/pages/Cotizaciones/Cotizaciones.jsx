@@ -138,6 +138,7 @@ export default function ListadoCotizaciones() {
                               <RegistroCotizaciones
                                 initialData={cot}
                                 setShowModal={setShowModal}
+                                setShow={setShowModal}
                               />
                             );
                           }}

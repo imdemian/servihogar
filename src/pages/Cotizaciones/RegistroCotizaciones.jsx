@@ -128,11 +128,13 @@ const RegistroCotizaciones = ({ initialData, setShow }) => {
       if (initialData && initialData.id) {
         await actualizarCotizacion(initialData.id, payload);
         toast.success("Cotización actualizada");
+        setShow(false);
       } else {
         await registrarCotizacion(payload);
         if (setShow) setShow(false);
         else navigate("/cotizaciones");
         toast.success("Cotización guardada");
+        setShow(false);
       }
     } catch (err) {
       console.error(err);

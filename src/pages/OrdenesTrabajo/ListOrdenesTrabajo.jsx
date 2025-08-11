@@ -195,9 +195,19 @@ export default function OrdenesTrabajo() {
     () =>
       ordenes.filter((o) => {
         const term = filterText.toLowerCase();
+
+        const nombreCompleto = [
+          o.cliente.nombre,
+          o.cliente.apellidoPaterno,
+          o.cliente.apellidoMaterno,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
         return (
           o.folio.toLowerCase().includes(term) ||
-          o.cliente.nombre.toLowerCase().includes(term) ||
+          nombreCompleto.includes(term) ||
           o.status.toLowerCase().includes(term)
         );
       }),
