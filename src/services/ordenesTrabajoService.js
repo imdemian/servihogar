@@ -31,12 +31,27 @@ async function authHeaders() {
 }
 
 /**
- * Obtener todas las órdenes de trabajo
- * @returns {Promise<Array>} lista de órdenes
+ * Obtener órdenes de trabajo paginadas (por fecha de creación)
+ * @param {Object} opts
+ * @param {number} [opts.limit=20] - Límite por página
+ * @param {string|null} [opts.cursorSort] - Fecha ISO del último elemento
+ * @param {string|null} [opts.cursorId]   - ID del último elemento
+ * @returns {Promise<{ ordenes: any[], pageSize: number, hasMore: boolean, nextCursor: {cursorSort: string, cursorId: string} | null }>}
  */
-export async function obtenerOrdenesTrabajo() {
+export async function obtenerOrdenesTrabajo(opts = {}) {
+  const { limit = 5, cursorSort, cursorId } = opts;
+
   const headers = await authHeaders();
-  const { data } = await axios.get(`${BASE}/ordenesTrabajo`, { headers });
+  const params = new URLSearchParams();
+
+  if (limit) params.append("limit", limit);
+  if (cursorSort) params.append("cursorSort", cursorSort);
+  if (cursorId) params.append("cursorId", cursorId);
+
+  const { data } = await axios.get(
+    `${BASE}/ordenesTrabajo?${params.toString()}`,
+    { headers }
+  );
   return data;
 }
 
@@ -51,6 +66,18 @@ export async function obtenerOrdenesTrabajoPendientes() {
   return data.filter(
     (orden) => orden.status !== "PAGADO" && orden.status !== "REVISADA"
   );
+}
+
+/**
+ * Obtener órdenes de trabajo en garantía
+ * @return {Promise<Array>} lista de órdenes en garantía
+ */
+export async function obtenerOrdenesTrabajoGarantia() {
+  const headers = await authHeaders();
+  const { data } = await axios.get(`${BASE}/ordenesTrabajo/garantia`, {
+    headers,
+  });
+  return data;
 }
 
 /**

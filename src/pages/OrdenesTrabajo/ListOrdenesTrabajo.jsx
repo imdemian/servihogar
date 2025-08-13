@@ -10,8 +10,7 @@ import {
   faMoneyBill,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
-import { db } from "../../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+
 import AddServicios from "./mods/addServicios";
 import DetalleOrdenTrabajo from "./DetalleOrdenTrabajo";
 import RegistroOrdenServicio from "./RegistroOrdenServicio";
@@ -20,10 +19,18 @@ import BasicModal from "../../components/BasicModal/BasicModal";
 import { AuthContext } from "../../utils/context";
 import ConfirmarEliminacion from "./mods/confirmarEliminacion";
 
+// 👉 usa el service paginado del backend
+import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
+
 export default function OrdenesTrabajo() {
   const [ordenes, setOrdenes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filterText, setFilterText] = useState("");
+
+  // Estado de paginación del backend
+  const [hasMore, setHasMore] = useState(true);
+  const [nextCursor, setNextCursor] = useState(null); // { cursorSort, cursorId } | null
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -32,27 +39,68 @@ export default function OrdenesTrabajo() {
 
   const { userRole } = useContext(AuthContext);
 
-  // (Re)carga las órdenes al montar y cada vez que se cierra el modal
-  useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, "ordenesTrabajo"),
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setOrdenes(data);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Error al obtener órdenes:", error);
-        toast.error("Error al cargar órdenes en tiempo real");
-        setLoading(false);
-      }
-    );
+  // Helpers de fecha (defensivos: string o Timestamp)
+  const fmtDate = (v) => {
+    const d = v?.toDate?.() ?? (v ? new Date(v) : null);
+    return d ? d.toLocaleDateString() : "-";
+  };
 
-    return () => unsub(); // limpieza del listener
+  // Carga inicial (primera página)
+  const loadFirstPage = async () => {
+    try {
+      setLoading(true);
+      const { ordenes, hasMore, nextCursor } = await obtenerOrdenesTrabajo({
+        limit: 100,
+      });
+      setOrdenes(ordenes || []);
+      setHasMore(!!hasMore);
+      setNextCursor(nextCursor || null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al cargar órdenes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar más (siguiente página)
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    try {
+      setLoadingMore(true);
+      const {
+        ordenes: extra,
+        hasMore: more,
+        nextCursor: cursor,
+      } = await obtenerOrdenesTrabajo({
+        limit: 20,
+        cursorSort: nextCursor?.cursorSort,
+        cursorId: nextCursor?.cursorId,
+      });
+      setOrdenes((prev) => [...prev, ...(extra || [])]);
+      setHasMore(!!more);
+      setNextCursor(cursor || null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al cargar más órdenes.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Montaje
+  useEffect(() => {
+    loadFirstPage();
   }, []);
+
+  // Al cerrar modal, refrescar primera página (para ver cambios)
+  useEffect(() => {
+    if (!showModal) {
+      const t = setTimeout(() => loadFirstPage(), 150);
+      return () => clearTimeout(t);
+    }
+    console.log(ordenes);
+  }, [showModal]);
 
   const columns = useMemo(
     () => [
@@ -64,7 +112,7 @@ export default function OrdenesTrabajo() {
       {
         name: "Cliente",
         selector: (row) =>
-          [row.cliente.nombre, row.cliente.apellidoPaterno]
+          [row?.cliente?.nombre, row?.cliente?.apellidoPaterno]
             .filter(Boolean)
             .join(" "),
         sortable: true,
@@ -72,27 +120,29 @@ export default function OrdenesTrabajo() {
       },
       {
         name: "Recepción",
-        selector: (row) => new Date(row.fechaRecepcion).toLocaleDateString(),
+        selector: (row) => fmtDate(row?.fechaRecepcion),
         sortable: true,
       },
       {
         name: "Entrega",
-        selector: (row) =>
-          row.fechaEntrega
-            ? new Date(row.fechaEntrega).toLocaleDateString()
-            : "-",
+        selector: (row) => fmtDate(row?.fechaEntrega),
         sortable: true,
       },
       {
         name: "Anticipo",
-        selector: (row) => `$${row.anticipo.toFixed(2)}`,
+        selector: (row) =>
+          typeof row.anticipo === "number"
+            ? `$${row.anticipo.toFixed(2)}`
+            : "$0.00",
         sortable: true,
         center: true,
       },
       {
         name: "Total",
         selector: (row) =>
-          row.total != null ? `$${row.total.toFixed(2)}` : "PEND SERVICIO",
+          row.total != null
+            ? `$${Number(row.total).toFixed(2)}`
+            : "PEND SERVICIO",
         sortable: true,
         center: true,
       },
@@ -197,18 +247,18 @@ export default function OrdenesTrabajo() {
         const term = filterText.toLowerCase();
 
         const nombreCompleto = [
-          o.cliente.nombre,
-          o.cliente.apellidoPaterno,
-          o.cliente.apellidoMaterno,
+          o?.cliente?.nombre,
+          o?.cliente?.apellidoPaterno,
+          o?.cliente?.apellidoMaterno,
         ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
 
         return (
-          o.folio.toLowerCase().includes(term) ||
+          (o.folio || "").toLowerCase().includes(term) ||
           nombreCompleto.includes(term) ||
-          o.status.toLowerCase().includes(term)
+          (o.status || "").toLowerCase().includes(term)
         );
       }),
     [ordenes, filterText]
@@ -264,7 +314,7 @@ export default function OrdenesTrabajo() {
             title="Órdenes de Trabajo"
             columns={columns}
             data={filteredItems}
-            progressPending={loading}
+            progressPending={loading && ordenes.length === 0}
             pagination
             paginationPerPage={10}
             paginationRowsPerPageOptions={[10, 15, 20]}
@@ -275,10 +325,21 @@ export default function OrdenesTrabajo() {
             responsive
             customStyles={customStyles}
           />
+
+          {hasMore && (
+            <div className="text-center my-3">
+              <button
+                className="btn btn-outline-primary"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Cargando..." : "Cargar más"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* al cerrar, dispara recarga en useEffect */}
       <BasicModal
         show={showModal}
         setShow={setShowModal}

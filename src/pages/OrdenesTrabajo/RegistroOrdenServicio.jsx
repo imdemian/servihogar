@@ -109,12 +109,31 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
   const onSubmit = async (e) => {
     e.preventDefault();
 
+    // 1) Validar equipos
     const equiposValidos = datosOrden.equipos.filter(
       (eq) => eq.descripcion.trim() !== ""
     );
     if (equiposValidos.length === 0) {
       toast.warn("Debes agregar al menos un equipo con descripción válida.");
       return;
+    }
+
+    // 2) validar fecha de recepción (obligatoria)
+    if (!datosOrden.fechaRecepcion) {
+      toast.warn("La fecha de recepción es obligatoria.");
+      return;
+    }
+
+    // 3) si hay fechaEntrega, que no sea antes que recepción
+    if (datosOrden.fechaEntrega) {
+      const fr = new Date(datosOrden.fechaRecepcion);
+      const fe = new Date(datosOrden.fechaEntrega);
+      if (fe < fr) {
+        toast.warn(
+          "La fecha de entrega no puede ser anterior a la de recepción."
+        );
+        return;
+      }
     }
 
     try {

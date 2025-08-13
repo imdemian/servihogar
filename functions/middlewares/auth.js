@@ -1,16 +1,19 @@
-import admin from "../admin";
+// functions/middlewares/checkAuth.js
+import admin from "../admin.js";
 
 export async function checkAuth(req, res, next) {
-  const header = req.headers.authorization || "";
-  const match = header.match(/^Bearer (.+)$/);
-  if (!match) {
-    return res.status(401).json({ error: "Token no provisto" });
-  }
   try {
+    const header = req.headers.authorization || "";
+    const match = header.match(/^Bearer (.+)$/);
+    if (!match) {
+      return res.status(401).json({ message: "Token no provisto" });
+    }
+
     const decoded = await admin.auth().verifyIdToken(match[1]);
     req.uid = decoded.uid;
+    req.user = decoded; // por si luego usas custom claims (roles)
     next();
   } catch (err) {
-    return res.status(401).json({ error: "Token inválido" });
+    return res.status(401).json({ message: "Token inválido" });
   }
 }
