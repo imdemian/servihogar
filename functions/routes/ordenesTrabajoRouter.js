@@ -70,19 +70,83 @@ router.get("/", async (req, res) => {
 });
 
 /**
- * Listar las ordenes de trabajo que aún tienen garantía
+ * Listar órdenes que están en garantía (campo garantia === true).
  * GET /ordenesTrabajo/garantia
  */
-router.get("/garantia", async (req, res) => {
+router.get("/garantia", async (_req, res) => {
   try {
-    const snapshot = await ordenesCol
-      .where("status", "==", "GARANTIA")
-      .orderBy("fechaEntrega", "desc")
+    // Consulta simple: solo trae las que tienen garantia === true
+    const snap = await ordenesCol
+      .where("garantia", "==", true)
+      .orderBy("updatedAt", "desc") // opcional, para consistencia
       .get();
-    const list = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-    return res.json(list);
+
+    // Helper robusto para convertir fechas
+    const toDateSafe = (v) => {
+      if (!v) return null;
+      if (typeof v?.toDate === "function") return v.toDate();
+      if (v instanceof Date) return v;
+      if (typeof v === "string") {
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      if (typeof v === "object" && "seconds" in v) {
+        return new Date(v.seconds * 1000);
+      }
+      return null;
+    };
+
+    let skipped = 0;
+    const ordenes = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((o) => {
+        const d = toDateSafe(o.fechaEntrega);
+        if (!d) {
+          skipped++;
+          return false;
+        }
+        return true;
+      });
+
+    // Reforzar orden si quieres
+    ordenes.sort((a, b) => {
+      const da = toDateSafe(a.fechaEntrega) || new Date(0);
+      const db = toDateSafe(b.fechaEntrega) || new Date(0);
+      return db - da;
+    });
+
+    return res.json({
+      ordenes,
+      total: ordenes.length,
+      skipsPorFechaEntregaInvalida: skipped,
+      criteria: {
+        garantia: true,
+        order: "fechaEntrega desc (Firestore)",
+      },
+    });
   } catch (error) {
-    console.error("Error listando órdenes de trabajo en garantía:", error);
+    console.error("Error listando órdenes en garantía:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * Verificar si existe una orden con un folio dado
+ * GET /ordenesTrabajo/existsFolio/:folio
+ * Respuesta: { exists: boolean }
+ */
+router.get("/existsFolio/:folio", async (req, res) => {
+  try {
+    const { folio } = req.params;
+    if (!folio) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Folio requerido" });
+    }
+    const snap = await ordenesCol.where("folio", "==", folio).limit(1).get();
+    return res.json({ exists: !snap.empty });
+  } catch (error) {
+    console.error("Error verificando folio:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 });

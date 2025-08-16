@@ -77,6 +77,7 @@ export async function obtenerOrdenesTrabajoGarantia() {
   const { data } = await axios.get(`${BASE}/ordenesTrabajo/garantia`, {
     headers,
   });
+  console.log(data);
   return data;
 }
 
@@ -129,4 +130,14 @@ export async function eliminarOrdenTrabajo(id) {
     headers,
   });
   return data;
+}
+
+/** Verifica si un folio ya existe en la colección */
+export async function existeFolio(folio) {
+  const headers = await authHeaders();
+  const { data } = await axios.get(
+    `${BASE}/ordenesTrabajo/existsFolio/${folio}`,
+    { headers }
+  );
+  return !!data?.exists;
 }

@@ -7,6 +7,7 @@ import {
   faArrowsToEye,
   faCheck,
   faEye,
+  faFileArrowDown,
   faListCheck,
   faMoneyBill,
 } from "@fortawesome/free-solid-svg-icons";
@@ -24,15 +25,20 @@ import CambioStatusCot from "../Cotizaciones/CambioStatusCot";
 import { db } from "../../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { AuthContext } from "../../utils/context";
-
+import { obtenerOrdenesTrabajoGarantia } from "../../services/ordenesTrabajoService";
 import "./Home.scss";
+import AgregarServicioGarantia from "../OrdenesTrabajo/mods/agregarServicioGarantia";
+import { generarNotaOrdenServicio } from "../../services/pdfs/notaOrdenPDFgen";
 
 export default function Home() {
   const { user } = useContext(AuthContext);
 
   const [ordenesServicio, setOrdenesServicio] = useState([]);
   const [cotizacionesPendientes, setCotizacionesPendientes] = useState([]);
+  const [garantias30, setGarantias30] = useState([]); // 👈 NUEVO
+
   const [loading, setLoading] = useState(true);
+  const [loadingGarantias, setLoadingGarantias] = useState(true); // 👈 NUEVO
 
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
@@ -91,7 +97,7 @@ export default function Home() {
       size: "sm",
     });
 
-  // 🔁 Escuchar cambios en tiempo real
+  // 🔁 Escuchar cambios en tiempo real (lo de siempre que ya tienes)
   useEffect(() => {
     if (!user) return;
 
@@ -133,6 +139,83 @@ export default function Home() {
       unsubOrdenes();
       unsubCotizaciones();
     };
+  }, [user]);
+
+  // Helpers para formateo
+  const formatFecha = (tsOrString) => {
+    try {
+      if (!tsOrString) return "—";
+      // Si viene de Firestore Timestamp con .toDate()
+      const d =
+        typeof tsOrString?.toDate === "function"
+          ? tsOrString.toDate()
+          : new Date(tsOrString);
+      return d.toLocaleDateString("es-MX");
+    } catch {
+      return String(tsOrString);
+    }
+  };
+
+  const mapRowToPdfOrden = (row) => {
+    // Ajusta estos campos a tu esquema real
+    const clienteNombre =
+      row?.cliente?.nombre ||
+      row?.clienteNombre ||
+      row?.cliente?.displayName ||
+      "Cliente";
+
+    const servicios = (row?.servicios || row?.items || []).map((s) => ({
+      servicio: s.servicio || s.descripcion || s.concepto || "Servicio",
+      cantidad: Number(s.cantidad ?? 1),
+      precio: Number(s.precio ?? s.precioUnitario ?? 0),
+      total: Number(
+        s.total ?? (s.precio ?? s.precioUnitario ?? 0) * (s.cantidad ?? 1)
+      ),
+    }));
+
+    const totalCalc = servicios.reduce((a, b) => a + Number(b.total || 0), 0);
+
+    return {
+      numero: row.folio || row.numero || row.id || "SIN-FOLIO",
+      fecha: formatFecha(
+        row.fechaEntrega || row.createdAt || row.fechaCreacion
+      ),
+      cliente: {
+        nombre: clienteNombre,
+        telefono: row?.cliente?.telefono || row?.telefono || "",
+        direccion: row?.cliente?.direccion || row?.direccion || "",
+      },
+      servicios,
+      total: Number(row?.total ?? totalCalc),
+      observaciones: row?.observaciones || row?.nota || row?.comentarios || "",
+    };
+  };
+
+  const handleDescargarNota = (row) => {
+    try {
+      const ordenPDF = mapRowToPdfOrden(row);
+      generarNotaOrdenServicio(ordenPDF);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo generar la nota PDF.");
+    }
+  };
+
+  // 👇 NUEVO: cargar garantías (PAGADO con fechaEntrega ≤30 días) desde el backend
+  useEffect(() => {
+    const loadGarantias = async () => {
+      try {
+        setLoadingGarantias(true);
+        const { ordenes } = await obtenerOrdenesTrabajoGarantia(); // GET /ordenesTrabajo/pendientesYGarantia
+        setGarantias30(Array.isArray(ordenes) ? ordenes : []);
+      } catch (e) {
+        console.error(e);
+        toast.error("Error al cargar órdenes en garantía.");
+      } finally {
+        setLoadingGarantias(false);
+      }
+    };
+    if (user) loadGarantias();
   }, [user]);
 
   const columnsOrdenes = [
@@ -269,6 +352,104 @@ export default function Home() {
     },
   ];
 
+  // Columnas para Garantía (últimos 90 días)
+  const columnsGarantia = [
+    { name: "Folio", selector: (row) => row.folio, sortable: true },
+    {
+      name: "Cliente",
+      selector: (row) =>
+        [row?.cliente?.nombre, row?.cliente?.apellidoPaterno]
+          .filter(Boolean)
+          .join(" ") || "-",
+      sortable: true,
+    },
+    {
+      name: "Entregada",
+      selector: (row) => {
+        const v = row.fechaEntrega;
+        const d =
+          typeof v?.toDate === "function"
+            ? v.toDate()
+            : typeof v === "string"
+            ? new Date(v)
+            : v instanceof Date
+            ? v
+            : null;
+        return d ? d.toLocaleDateString() : "-";
+      },
+      sortable: true,
+    },
+    {
+      name: "Días desde entrega",
+      selector: (row) => {
+        const v = row.fechaEntrega;
+        const d =
+          typeof v?.toDate === "function"
+            ? v.toDate()
+            : typeof v === "string"
+            ? new Date(v)
+            : v instanceof Date
+            ? v
+            : null;
+        if (!d) return "-";
+        const diff = Math.floor(
+          (Date.now() - d.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return `${diff} días`;
+      },
+    },
+    {
+      name: "Acciones",
+      ignoreRowClick: true,
+      cell: (row) => (
+        <div className="d-flex gap-2">
+          <button
+            className="btn btn-outline-primary btn-sm"
+            onClick={() =>
+              openModal({
+                title: `Detalle Orden: ${row.folio}`,
+                content: <DetalleOrdenTrabajo orden={row} />,
+                size: "lg",
+              })
+            }
+          >
+            <FontAwesomeIcon icon={faEye} />
+          </button>
+
+          {/* NUEVO: Agregar servicio en garantía */}
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() =>
+              openModal({
+                title: `Agregar servicio (garantía) — ${row.folio}`,
+                content: (
+                  <AgregarServicioGarantia
+                    orden={row}
+                    onDone={() => {
+                      toast.success("Servicio agregado a la orden.");
+                      closeModal();
+                    }}
+                  />
+                ),
+                size: "md",
+              })
+            }
+          >
+            <FontAwesomeIcon icon={faListCheck} />
+          </button>
+
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={() => handleDescargarNota(row)}
+            title="Descargar nota PDF"
+          >
+            <FontAwesomeIcon icon={faFileArrowDown} className="me-1" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   if (loading) return <p>Cargando datos...</p>;
 
   return (
@@ -299,6 +480,7 @@ export default function Home() {
             dense
           />
         </div>
+
         <div className="dashboard-panel">
           <h2>Cotizaciones Pendientes</h2>
           <DataTable
@@ -308,6 +490,22 @@ export default function Home() {
             highlightOnHover
             dense
           />
+        </div>
+
+        {/*  NUEVO PANEL de Garantía */}
+        <div className="dashboard-panel">
+          <h2>Órdenes en garantía (últimos 90 días)</h2>
+          {loadingGarantias ? (
+            <p>Cargando garantías...</p>
+          ) : (
+            <DataTable
+              columns={columnsGarantia}
+              data={garantias30}
+              pagination
+              highlightOnHover
+              dense
+            />
+          )}
         </div>
       </div>
 

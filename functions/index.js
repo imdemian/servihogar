@@ -5,6 +5,7 @@ import cors from "cors";
 
 // Asegúrate de inicializar admin antes de montar cualquier ruta
 import "./admin.js";
+import "./triggers/index.js";
 
 import usuariosRouter from "./routes/usuariosRouter.js";
 import clientesRouter from "./routes/clientesRouter.js";
@@ -25,5 +26,3 @@ app.use("/ordenesTrabajo", ordenesTrabajoRouter);
 
 // Exporta la función HTTP
 export const api = functions.https.onRequest(app);
-
-import "./triggers/index.js";

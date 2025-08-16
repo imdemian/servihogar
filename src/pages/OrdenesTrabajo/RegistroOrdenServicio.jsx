@@ -1,5 +1,6 @@
+// src/pages/OrdenesTrabajo/RegistroOrdenServicio.jsx
 import React, { useEffect, useState, useRef } from "react";
-import { obtenerClientes } from "../../services/clientesService";
+import { buscarClientes } from "../../services/clientesService";
 import { obtenerEmpleados } from "../../services/empleadosService";
 import { registrarOrdenTrabajo } from "../../services/ordenesTrabajoService";
 import { toast } from "react-toastify";
@@ -8,13 +9,31 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { generateUniqueFolio } from "../../utils/folioUtils";
 
 const RegistroOrdenServicio = ({ setShowModal }) => {
-  const [clientes, setClientes] = useState([]);
+  // Empleados (sí se cargan todos porque suele ser una lista corta)
   const [empleados, setEmpleados] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filteredClientes, setFilteredClientes] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const wrapperRef = useRef(null);
 
+  // Autocompletado de Clientes
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState("nombre"); // "nombre" | "direccion"
+  const [debouncedTerm, setDebouncedTerm] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggCursor, setSuggCursor] = useState(null);
+  const [suggLoading, setSuggLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Click-outside para cerrar el dropdown
+  const wrapperRef = useRef(null);
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Datos de la orden
   const [datosOrden, setDatosOrden] = useState({
     folio: "",
     cliente: {
@@ -27,7 +46,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     },
     descripcionFalla: "",
     equipos: [{ descripcion: "", marca: "", modelo: "" }],
-    empleados: [],
+    empleados: [], // ids de empleados que participan (opcional)
     servicios: [{ servicio: "", precioUnitario: 0, cantidad: 1, total: 0 }],
     fechaRecepcion: "",
     fechaEntrega: "",
@@ -36,40 +55,74 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     status: "CREADA",
   });
 
+  // Cargar empleados al montar
   useEffect(() => {
     (async () => {
       try {
-        const [cli, emp] = await Promise.all([
-          obtenerClientes(),
-          obtenerEmpleados(),
-        ]);
-        setClientes(cli);
-        setEmpleados(emp);
+        const emp = await obtenerEmpleados();
+        setEmpleados(emp || []);
       } catch (err) {
         console.error(err);
+        toast.error("No se pudieron cargar los empleados");
       }
     })();
-
-    const handleClickOutside = (e) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Debounce del término de búsqueda
   useEffect(() => {
-    const term = searchTerm.toLowerCase();
-    setFilteredClientes(
-      clientes.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(term) ||
-          (c.telefono || "").includes(term)
-      )
-    );
-  }, [searchTerm, clientes]);
+    const t = setTimeout(() => setDebouncedTerm(searchTerm.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
+  // Buscar sugerencias en backend cuando hay término (>= 2)
+  useEffect(() => {
+    const fetch = async () => {
+      if (debouncedTerm.length < 2) {
+        setSuggestions([]);
+        setSuggCursor(null);
+        return;
+      }
+      setSuggLoading(true);
+      try {
+        const { items, nextCursor } = await buscarClientes({
+          q: debouncedTerm,
+          field: searchField,
+          limit: 10,
+        });
+        setSuggestions(items || []);
+        setSuggCursor(nextCursor || null);
+      } catch (e) {
+        console.error(e);
+        toast.error("Error buscando clientes");
+      } finally {
+        setSuggLoading(false);
+      }
+    };
+    fetch();
+  }, [debouncedTerm, searchField]);
+
+  // Cargar más sugerencias
+  async function loadMoreSuggestions() {
+    if (!suggCursor || suggLoading || debouncedTerm.length < 2) return;
+    setSuggLoading(true);
+    try {
+      const { items, nextCursor } = await buscarClientes({
+        q: debouncedTerm,
+        field: searchField,
+        limit: 10,
+        cursor: suggCursor,
+      });
+      setSuggestions((prev) => [...prev, ...(items || [])]);
+      setSuggCursor(nextCursor || null);
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudieron cargar más resultados");
+    } finally {
+      setSuggLoading(false);
+    }
+  }
+
+  // Seleccionar cliente de la lista
   const selectCliente = (c) => {
     setDatosOrden((prev) => ({
       ...prev,
@@ -82,23 +135,25 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
         direccion: c.direccion,
       },
     }));
-    setSearchTerm(`${c.nombre} — ${c.telefono}`);
+    const nombreCompleto = [c.nombre, c.apellidoPaterno, c.apellidoMaterno]
+      .filter(Boolean)
+      .join(" ");
+    setSearchTerm(`${nombreCompleto} — ${c.telefono || "s/ teléfono"}`);
     setShowSuggestions(false);
   };
 
+  // Equipos
   const handleEquipoChange = (idx, field, value) => {
     const nuevos = [...datosOrden.equipos];
     nuevos[idx][field] = value;
     setDatosOrden((prev) => ({ ...prev, equipos: nuevos }));
   };
-
   const handleAddEquipo = () => {
     setDatosOrden((prev) => ({
       ...prev,
       equipos: [...prev.equipos, { descripcion: "", marca: "", modelo: "" }],
     }));
   };
-
   const handleRemoveEquipo = (idx) => {
     setDatosOrden((prev) => ({
       ...prev,
@@ -106,10 +161,16 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     }));
   };
 
+  // Validaciones + submit
   const onSubmit = async (e) => {
     e.preventDefault();
 
-    // 1) Validar equipos
+    // Validar cliente
+    if (!datosOrden.cliente?.id) {
+      toast.warn("Selecciona un cliente de la lista de sugerencias.");
+      return;
+    }
+    // Validar equipos
     const equiposValidos = datosOrden.equipos.filter(
       (eq) => eq.descripcion.trim() !== ""
     );
@@ -117,14 +178,12 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
       toast.warn("Debes agregar al menos un equipo con descripción válida.");
       return;
     }
-
-    // 2) validar fecha de recepción (obligatoria)
+    // Validar fecha recepción
     if (!datosOrden.fechaRecepcion) {
       toast.warn("La fecha de recepción es obligatoria.");
       return;
     }
-
-    // 3) si hay fechaEntrega, que no sea antes que recepción
+    // Validar fecha entrega >= recepción
     if (datosOrden.fechaEntrega) {
       const fr = new Date(datosOrden.fechaRecepcion);
       const fe = new Date(datosOrden.fechaEntrega);
@@ -140,10 +199,13 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
       const folio = await generateUniqueFolio(10);
       const payload = {
         ...datosOrden,
+        equipos: equiposValidos,
         folio,
       };
       await registrarOrdenTrabajo(payload);
-      toast.success("Orden registrada correctamente (folio: " + folio + ")");
+      toast.success(`Orden registrada correctamente (folio: ${folio})`);
+
+      // Reset
       setDatosOrden({
         folio: "",
         cliente: {
@@ -165,13 +227,13 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
         status: "CREADA",
       });
       setSearchTerm("");
+      setSuggestions([]);
+      setSuggCursor(null);
       setShowSuggestions(false);
       setShowModal(false);
     } catch (err) {
       console.error(err);
       toast.error("No se pudo registrar la orden");
-    } finally {
-      setShowModal(false);
     }
   };
 
@@ -184,32 +246,89 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
       {/* Cliente */}
       <div className="mb-4 position-relative">
         <label className="form-label">Cliente</label>
-        <input
-          type="text"
-          className="form-control"
-          placeholder="Buscar cliente..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setShowSuggestions(true);
-          }}
-          onFocus={() => setShowSuggestions(true)}
-        />
-        {showSuggestions && filteredClientes.length > 0 && (
-          <ul
-            className="list-group position-absolute w-100 mt-1 shadow"
-            style={{ maxHeight: "200px", overflowY: "auto", zIndex: 1000 }}
+        <div className="d-flex gap-2">
+          <input
+            type="text"
+            className="form-control"
+            placeholder={`Buscar por ${
+              searchField === "nombre" ? "nombre" : "dirección"
+            }... (min 2 letras)`}
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+          />
+          <select
+            className="form-select"
+            style={{ maxWidth: 160 }}
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value)}
           >
-            {filteredClientes.map((c) => (
-              <li
-                key={c.id}
-                className="list-group-item list-group-item-action"
-                onClick={() => selectCliente(c)}
-              >
-                {c.nombre} — {c.telefono}
-              </li>
-            ))}
-          </ul>
+            <option value="nombre">Nombre</option>
+            <option value="direccion">Dirección</option>
+          </select>
+        </div>
+
+        {showSuggestions && (suggLoading || suggestions.length > 0) && (
+          <div
+            className="card position-absolute w-100 mt-1 shadow"
+            style={{ maxHeight: 280, overflowY: "auto", zIndex: 1000 }}
+          >
+            <ul className="list-group list-group-flush">
+              {suggLoading && suggestions.length === 0 && (
+                <li className="list-group-item text-muted">Buscando…</li>
+              )}
+
+              {suggestions.map((c) => {
+                const nombreCompleto = [
+                  c.nombre,
+                  c.apellidoPaterno,
+                  c.apellidoMaterno,
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                return (
+                  <li
+                    key={c.id}
+                    className="list-group-item list-group-item-action"
+                    onClick={() => selectCliente(c)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="fw-semibold">
+                      {nombreCompleto || "Sin nombre"}
+                    </div>
+                    <small className="text-muted">
+                      {c.telefono || "s/ teléfono"} —{" "}
+                      {c.direccion || "s/ dirección"}
+                    </small>
+                  </li>
+                );
+              })}
+
+              {suggCursor && (
+                <li className="list-group-item text-center">
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={loadMoreSuggestions}
+                    disabled={suggLoading}
+                  >
+                    {suggLoading ? "Cargando…" : "Cargar más"}
+                  </button>
+                </li>
+              )}
+
+              {!suggLoading &&
+                suggestions.length === 0 &&
+                debouncedTerm.length >= 2 && (
+                  <li className="list-group-item text-muted">
+                    Sin coincidencias.
+                  </li>
+                )}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -294,8 +413,9 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
               descripcionFalla: e.target.value,
             }))
           }
-        ></textarea>
+        />
       </div>
+
       <div className="row mb-4">
         <div className="col-md-6">
           <label className="form-label">Fecha Recepción</label>
@@ -326,6 +446,31 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
           />
         </div>
       </div>
+
+      {/* (Opcional) Selección de empleados participantes */}
+      {/* 
+      <div className="mb-4">
+        <label className="form-label">Empleados que participan</label>
+        <select
+          multiple
+          className="form-select"
+          value={datosOrden.empleados}
+          onChange={(e) =>
+            setDatosOrden((prev) => ({
+              ...prev,
+              empleados: Array.from(e.target.selectedOptions, (o) => o.value),
+            }))
+          }
+        >
+          {empleados.map((emp) => (
+            <option key={emp.id} value={emp.id}>
+              {emp.nombre} {emp.apellidoPaterno || ""} {emp.apellidoMaterno || ""}
+            </option>
+          ))}
+        </select>
+        <small className="text-muted">Ctrl/Cmd + clic para seleccionar múltiples.</small>
+      </div>
+      */}
 
       <div className="text-end">
         <button type="submit" className="btn btn-primary">

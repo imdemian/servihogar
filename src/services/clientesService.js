@@ -1,67 +1,85 @@
 // src/services/clientesService.js
 import axios from "axios";
-import { getIdTokenForUser } from "./authService"; // o donde hayas puesto tu auth.js
+import { getIdTokenForUser } from "./authService";
 
-// Leemos la nueva variable que acabamos de definir en .env.local:
 const FORCE_DEV = import.meta.env.VITE_FORCE_DEV === "true";
-
-// Si FORCE_DEV es false, omitimos el emulador aunque estemos en modo DEV de Vite:
 const USE_EMULATOR = import.meta.env.DEV && FORCE_DEV;
 
-// Base URL de tus Functions: emulador en DEV, Cloud en prod
-// Construimos la URL base:
 const BASE = USE_EMULATOR
   ? import.meta.env.VITE_FUNCTIONS_EMULATOR_URL
   : `https://us-central1-${
       import.meta.env.VITE_FIREBASE_PROJECT_ID
     }.cloudfunctions.net/api`;
 
-/**
- * Construye los headers con el token de Firebase Auth si hay usuario.
- */
 async function authHeaders() {
   const token = await getIdTokenForUser();
   return token
-    ? {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      }
-    : {
-        "Content-Type": "application/json",
-      };
+    ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" };
 }
 
-// Crear cliente
+// ---------- CRUD ----------
 export async function registrarCliente(data) {
   const headers = await authHeaders();
-  const res = await axios.post(`${BASE}/clientes`, data, { headers });
-  return res.data;
+  const { data: res } = await axios.post(`${BASE}/clientes`, data, { headers });
+  return res; // { id, ...campos }
 }
 
-// Obtener todos los clientes
-export async function obtenerClientes() {
-  const headers = await authHeaders();
-  const res = await axios.get(`${BASE}/clientes`, { headers });
-  return res.data;
-}
-
-// Obtener un cliente por ID
 export async function obtenerCliente(id) {
   const headers = await authHeaders();
-  const res = await axios.get(`${BASE}/clientes/${id}`, { headers });
-  return res.data;
+  const { data: res } = await axios.get(`${BASE}/clientes/${id}`, { headers });
+  return res; // { id, ...campos }
 }
 
-// Actualizar cliente
 export async function actualizarCliente(id, data) {
   const headers = await authHeaders();
-  const res = await axios.put(`${BASE}/clientes/${id}`, data, { headers });
-  return res.data;
+  const { data: res } = await axios.put(`${BASE}/clientes/${id}`, data, {
+    headers,
+  });
+  return res; // { id, ...campos }
 }
 
-// Eliminar cliente
 export async function eliminarCliente(id) {
   const headers = await authHeaders();
   const res = await axios.delete(`${BASE}/clientes/${id}`, { headers });
-  return res;
+  return res; // status 200/404/500 ...
+}
+
+// ---------- Nuevos: listado paginado y búsqueda ----------
+// GET /clientes?limit=&cursor=
+export async function obtenerClientesPaginado({
+  limit = 20,
+  cursor = null,
+} = {}) {
+  const headers = await authHeaders();
+  const params = { limit };
+  if (cursor) params.cursor = cursor;
+
+  const { data } = await axios.get(`${BASE}/clientes`, { headers, params });
+  // data: { items: Cliente[], nextCursor: string|null }
+  return data;
+}
+
+// GET /clientes/search?q=&field=nombre|direccion&limit=&cursor=
+export async function buscarClientes({
+  q,
+  field = "nombre",
+  limit = 20,
+  cursor = null,
+} = {}) {
+  if (!q || !q.trim()) {
+    // si no hay término, conviene reutilizar el listado normal
+    return obtenerClientesPaginado({ limit, cursor });
+  }
+
+  const headers = await authHeaders();
+  const params = { q: q.trim(), field, limit };
+  if (cursor) params.cursor = cursor;
+
+  const { data } = await axios.get(`${BASE}/clientes/search`, {
+    headers,
+    params,
+  });
+  // data: { items: Cliente[], nextCursor: string|null }
+  return data;
 }

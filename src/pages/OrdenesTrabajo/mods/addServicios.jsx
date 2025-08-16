@@ -134,21 +134,21 @@ const AddServicios = ({ orden, onClose, setShowModal }) => {
   // Click en Actualizar Orden
   const handleUpdateClick = async () => {
     try {
-      // Validar fecha de entrega obligatoria
-      if (!datosOrden.fechaEntrega) {
-        toast.error("Por favor selecciona una fecha de entrega.");
-        return;
-      }
+      // Solo valido orden cronológica si HAY fechaEntrega
+      const tieneEntrega =
+        datosOrden.fechaEntrega !== null &&
+        datosOrden.fechaEntrega !== undefined &&
+        String(datosOrden.fechaEntrega).trim() !== "";
 
-      // Validar que fechaEntrega no sea anterior a fechaRecepcion
-      const fechaRecepcion = new Date(datosOrden.fechaRecepcion);
-      const fechaEntrega = new Date(datosOrden.fechaEntrega);
-
-      if (fechaEntrega < fechaRecepcion) {
-        toast.error(
-          "La fecha de entrega no puede ser anterior a la fecha de recepción."
-        );
-        return;
+      if (tieneEntrega) {
+        const fechaRecepcion = new Date(datosOrden.fechaRecepcion);
+        const fechaEntrega = new Date(datosOrden.fechaEntrega);
+        if (fechaEntrega < fechaRecepcion) {
+          toast.error(
+            "La fecha de entrega no puede ser anterior a la fecha de recepción."
+          );
+          return;
+        }
       }
 
       let urls = datosOrden.fotos;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -11,26 +11,49 @@ import {
 import RegistroClientes from "./Registro.clientes";
 import EliminarCliente from "./Eliminacion.clientes";
 import BasicModal from "../../components/BasicModal/BasicModal";
-import { obtenerClientes } from "../../services/clientesService";
+import {
+  obtenerClientesPaginado,
+  buscarClientes,
+} from "../../services/clientesService";
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // búsqueda
   const [filterText, setFilterText] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
+  const [searchField, setSearchField] = useState("nombre"); // 'nombre' | 'direccion'
+  const [isSearching, setIsSearching] = useState(false);
+
+  // paginación con cursor
+  const [cursor, setCursor] = useState(null);
+  const PAGE_SIZE = 100;
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
 
-  // Fetch clientes (re-run when modal closes to refresh list)
+  // Debounce del texto de búsqueda (400 ms)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTerm(filterText.trim()), 400);
+    return () => clearTimeout(t);
+  }, [filterText]);
+
+  // Primera carga o cuando se cierra modal (refrescar)
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const data = await obtenerClientes();
-        setClientes(data);
-      } catch {
+        const { items, nextCursor } = await obtenerClientesPaginado({
+          limit: PAGE_SIZE,
+        });
+        setClientes(items);
+        setCursor(nextCursor);
+        setIsSearching(false);
+      } catch (e) {
+        console.error(e);
         toast.error("Error al cargar clientes");
       } finally {
         setLoading(false);
@@ -38,7 +61,74 @@ export default function Clientes() {
     })();
   }, [showModal]);
 
-  // Columns definition without invalid DOM props
+  // Efecto de búsqueda (cuando cambia debouncedTerm o searchField)
+  useEffect(() => {
+    (async () => {
+      // si no hay término, recarga listado normal
+      if (!debouncedTerm) {
+        setLoading(true);
+        try {
+          const { items, nextCursor } = await obtenerClientesPaginado({
+            limit: PAGE_SIZE,
+          });
+          setClientes(items);
+          setCursor(nextCursor);
+          setIsSearching(false);
+        } catch (e) {
+          console.error(e);
+          toast.error("Error al cargar clientes");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // hay término: búsqueda
+      setLoading(true);
+      try {
+        const { items, nextCursor } = await buscarClientes({
+          q: debouncedTerm,
+          field: searchField,
+          limit: PAGE_SIZE,
+        });
+        setClientes(items);
+        setCursor(nextCursor);
+        setIsSearching(true);
+      } catch (e) {
+        console.error(e);
+        toast.error("Error en la búsqueda");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [debouncedTerm, searchField]);
+
+  async function handleLoadMore() {
+    if (!cursor) return;
+    setLoading(true);
+    try {
+      let res;
+      if (isSearching && debouncedTerm) {
+        res = await buscarClientes({
+          q: debouncedTerm,
+          field: searchField,
+          limit: PAGE_SIZE,
+          cursor,
+        });
+      } else {
+        res = await obtenerClientesPaginado({ limit: PAGE_SIZE, cursor });
+      }
+      setClientes((prev) => [...prev, ...(res.items || [])]);
+      setCursor(res.nextCursor || null);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al cargar más");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Columnas
   const columns = useMemo(
     () => [
       {
@@ -58,7 +148,6 @@ export default function Clientes() {
         name: "Dirección",
         selector: (row) => row.direccion || "-",
         sortable: true,
-        // control width instead of `grow`
         minWidth: "200px",
       },
       {
@@ -101,43 +190,40 @@ export default function Clientes() {
           </>
         ),
         ignoreRowClick: true,
-        // allow overflow of the buttons
         style: { overflow: "visible" },
       },
     ],
     []
   );
 
-  // Filtered data
-  const filteredItems = clientes.filter((c) => {
-    const term = filterText.toLowerCase();
-    const fullName = [c.nombre, c.apellidoPaterno, c.apellidoMaterno]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return (
-      fullName.includes(term) ||
-      (c.telefono || "").includes(term) ||
-      (c.direccion || "").toLowerCase().includes(term)
-    );
-  });
-
-  // Subheader: search + "Nuevo" button
+  // Subheader: campo + búsqueda + botón Nuevo
   const SubHeaderComponent = useMemo(
     () => (
-      <div className="d-flex w-100 align-items-center">
-        <div className="input-group me-2">
+      <div className="d-flex w-100 align-items-center flex-wrap gap-2">
+        <div className="input-group me-2" style={{ maxWidth: 420 }}>
           <span className="input-group-text">
             <FontAwesomeIcon icon={faSearch} />
           </span>
           <input
             type="text"
             className="form-control form-control-sm"
-            placeholder="Buscar..."
+            placeholder={`Buscar por ${
+              searchField === "nombre" ? "nombre" : "dirección"
+            }...`}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
           />
+          <select
+            className="form-select form-select-sm"
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value)}
+            style={{ maxWidth: 140 }}
+          >
+            <option value="nombre">Nombre</option>
+            <option value="direccion">Dirección</option>
+          </select>
         </div>
+
         <button
           className="btn btn-success btn-sm"
           onClick={() => {
@@ -148,12 +234,26 @@ export default function Clientes() {
         >
           <FontAwesomeIcon icon={faCirclePlus} /> Nuevo
         </button>
+
+        <div className="ms-auto">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={handleLoadMore}
+            disabled={!cursor || loading}
+            title={!cursor ? "No hay más resultados" : "Cargar más"}
+          >
+            {loading
+              ? "Cargando..."
+              : cursor
+              ? "Cargar más"
+              : "Sin más resultados"}
+          </button>
+        </div>
       </div>
     ),
-    [filterText]
+    [filterText, searchField, cursor, loading]
   );
 
-  // Custom table styles adding borders
   const customStyles = useMemo(
     () => ({
       table: { style: { border: "1px solid #dee2e6" } },
@@ -171,8 +271,10 @@ export default function Clientes() {
           <DataTable
             title="Clientes"
             columns={columns}
-            data={filteredItems}
+            data={clientes}
             progressPending={loading}
+            // dejamos la paginación del DataTable en cliente,
+            // y usamos "Cargar más" para traer más del backend
             pagination
             paginationPerPage={10}
             paginationRowsPerPageOptions={[10, 15, 20]}

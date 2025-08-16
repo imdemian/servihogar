@@ -1,29 +1,26 @@
 // utils/folioUtils.js
-import { obtenerOrdenesTrabajo } from "../services/ordenesTrabajoService";
+import { existeFolio } from "../services/ordenesTrabajoService";
 
-/**
- * Genera un folio aleatorio alfanumérico de longitud dada.
- */
+/** Genera un folio aleatorio (ajusta a tu formato actual) */
 export function generateFolio(length = 8) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let folio = "";
-  for (let i = 0; i < length; i++) {
-    folio += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return folio;
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < length; i++)
+    out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
 }
 
 /**
- * Genera un folio que no exista todavía en las órdenes.
+ * Genera un folio que no exista todavía.
+ * Evita cargar todas las órdenes; pregunta al backend si existe.
  */
-export async function generateUniqueFolio(length = 8) {
-  // 1) Trae todas las órdenes y extrae sus folios
-  const ordenes = await obtenerOrdenesTrabajo();
-  const existentes = new Set(ordenes.map((o) => o.folio));
-  // 2) Reintenta hasta obtener uno no usado
-  let folio;
-  do {
-    folio = generateFolio(length);
-  } while (existentes.has(folio));
-  return folio;
+export async function generateUniqueFolio(length = 8, maxTries = 30) {
+  for (let i = 0; i < maxTries; i++) {
+    const folio = generateFolio(length);
+    const exists = await existeFolio(folio);
+    if (!exists) return folio;
+  }
+  throw new Error(
+    "No se pudo generar un folio único después de varios intentos."
+  );
 }

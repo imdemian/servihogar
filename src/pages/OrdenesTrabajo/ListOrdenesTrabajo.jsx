@@ -99,8 +99,7 @@ export default function OrdenesTrabajo() {
       const t = setTimeout(() => loadFirstPage(), 150);
       return () => clearTimeout(t);
     }
-    console.log(ordenes);
-  }, [showModal]);
+  }, [showModal, ordenes]);
 
   const columns = useMemo(
     () => [

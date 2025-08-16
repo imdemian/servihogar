@@ -3,19 +3,11 @@ import { toast } from "react-toastify";
 import { actualizarOrdenTrabajo } from "../../../services/ordenesTrabajoService";
 import { obtenerEmpleados } from "../../../services/empleadosService";
 
-/**
- * Modal de forma de pago y responsable de entrega.
- *
- * @param {Object} props
- * @param {Object} props.orden            — la orden que vamos a actualizar.
- * @param {() => void} props.onUpdated    — callback tras guardar cambios.
- * @param {(show: boolean) => void} props.setShowModal — para cerrar el modal.
- */
 export default function FinalizarOrden({ orden, setShowModal }) {
   const [empleadosEmpresa, setEmpleadosEmpresa] = useState([]);
   const [responsableId, setResponsableId] = useState("");
+  const [fechaEntrega, setFechaEntrega] = useState(orden.fechaEntrega || "");
 
-  // Cargar todos los empleados al montar
   useEffect(() => {
     (async () => {
       try {
@@ -34,6 +26,21 @@ export default function FinalizarOrden({ orden, setShowModal }) {
       return;
     }
 
+    if (fechaEntrega) {
+      // fecha entrega que sea más reciente que la de recepción
+      const fechaRecepcion = new Date(orden.fechaRecepcion);
+      const fechaEntregaDate = new Date(fechaEntrega);
+      if (fechaEntregaDate < fechaRecepcion) {
+        toast.error(
+          "La fecha de entrega no puede ser anterior a la de recepción"
+        );
+        return;
+      }
+    } else {
+      toast.error("Debes seleccionar la fecha de entrega");
+      return;
+    }
+
     const responsable = empleadosEmpresa.find((e) => e.id === responsableId);
     if (!responsable) {
       toast.error("Empleado no válido");
@@ -45,6 +52,8 @@ export default function FinalizarOrden({ orden, setShowModal }) {
         ...orden,
         responsable,
         pago: method,
+        fechaEntrega,
+        garantia: true,
         status: orden.status === "REVISADA" ? "REVISADA" : "PAGADO",
       };
       await actualizarOrdenTrabajo(orden.id, payload);
@@ -58,6 +67,19 @@ export default function FinalizarOrden({ orden, setShowModal }) {
 
   return (
     <div>
+      {/* Mostrar input fecha solo si no la tiene */}
+      {!orden.fechaEntrega && (
+        <div className="mb-3">
+          <label className="form-label">Fecha de entrega:</label>
+          <input
+            type="date"
+            className="form-control"
+            value={fechaEntrega}
+            onChange={(e) => setFechaEntrega(e.target.value)}
+          />
+        </div>
+      )}
+
       <div className="mb-3">
         <label className="form-label">Entregado por:</label>
         <select
@@ -73,11 +95,12 @@ export default function FinalizarOrden({ orden, setShowModal }) {
           ))}
         </select>
       </div>
+
       <div className="d-flex justify-content-around">
         <button
           type="button"
           className="btn btn-outline-primary"
-          disabled={!responsableId}
+          disabled={!responsableId || !fechaEntrega}
           onClick={() => handleConfirmPayment("Transferencia")}
         >
           Transferencia
@@ -85,7 +108,7 @@ export default function FinalizarOrden({ orden, setShowModal }) {
         <button
           type="button"
           className="btn btn-outline-primary"
-          disabled={!responsableId}
+          disabled={!responsableId || !fechaEntrega}
           onClick={() => handleConfirmPayment("Efectivo")}
         >
           Efectivo
