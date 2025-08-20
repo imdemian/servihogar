@@ -1,5 +1,11 @@
 // src/pages/OrdenesTrabajo.jsx
-import React, { useEffect, useState, useMemo, useContext } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useContext,
+  useCallback,
+} from "react";
 import DataTable from "react-data-table-component";
 import { toast } from "react-toastify";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -19,20 +25,35 @@ import BasicModal from "../../components/BasicModal/BasicModal";
 import { AuthContext } from "../../utils/context";
 import ConfirmarEliminacion from "./mods/confirmarEliminacion";
 
-// 👉 usa el service paginado del backend
-import { obtenerOrdenesTrabajo } from "../../services/ordenesTrabajoService";
+// Services (listar + buscar)
+import {
+  obtenerOrdenesTrabajo,
+  buscarOrdenesTrabajo,
+} from "../../services/ordenesTrabajoService";
+
+// --- Utils de búsqueda local (para modo "listar") ---
+const normalize = (s) =>
+  (s ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const digitsOnly = (s) => (s ?? "").toString().replace(/\D+/g, "");
 
 export default function OrdenesTrabajo() {
   const [ordenes, setOrdenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filterText, setFilterText] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
 
-  // Estado de paginación del backend
+  // Paginación cursor-based
   const [hasMore, setHasMore] = useState(true);
   const [nextCursor, setNextCursor] = useState(null); // { cursorSort, cursorId } | null
 
-  // Modal state
+  // Modal
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalContent, setModalContent] = useState(null);
@@ -40,18 +61,26 @@ export default function OrdenesTrabajo() {
   const { userRole } = useContext(AuthContext);
 
   // Helpers de fecha (defensivos: string o Timestamp)
-  const fmtDate = (v) => {
+  const fmtDate = useCallback((v) => {
     const d = v?.toDate?.() ?? (v ? new Date(v) : null);
     return d ? d.toLocaleDateString() : "-";
-  };
+  }, []);
 
-  // Carga inicial (primera página)
-  const loadFirstPage = async () => {
+  // Debounce del término
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTerm(filterText.trim()), 350);
+    return () => clearTimeout(t);
+  }, [filterText]);
+
+  const isSearching = debouncedTerm.length > 0;
+
+  // Carga inicial o recarga (primera página)
+  const loadFirstPage = useCallback(async () => {
     try {
       setLoading(true);
-      const { ordenes, hasMore, nextCursor } = await obtenerOrdenesTrabajo({
-        limit: 100,
-      });
+      const { ordenes, hasMore, nextCursor } = await (isSearching
+        ? buscarOrdenesTrabajo({ q: debouncedTerm, limit: 50 })
+        : obtenerOrdenesTrabajo({ limit: 100 }));
       setOrdenes(ordenes || []);
       setHasMore(!!hasMore);
       setNextCursor(nextCursor || null);
@@ -61,10 +90,10 @@ export default function OrdenesTrabajo() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isSearching, debouncedTerm]);
 
   // Cargar más (siguiente página)
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return;
     try {
       setLoadingMore(true);
@@ -72,11 +101,18 @@ export default function OrdenesTrabajo() {
         ordenes: extra,
         hasMore: more,
         nextCursor: cursor,
-      } = await obtenerOrdenesTrabajo({
-        limit: 20,
-        cursorSort: nextCursor?.cursorSort,
-        cursorId: nextCursor?.cursorId,
-      });
+      } = await (isSearching
+        ? buscarOrdenesTrabajo({
+            q: debouncedTerm,
+            limit: 20,
+            cursorSort: nextCursor?.cursorSort,
+            cursorId: nextCursor?.cursorId,
+          })
+        : obtenerOrdenesTrabajo({
+            limit: 20,
+            cursorSort: nextCursor?.cursorSort,
+            cursorId: nextCursor?.cursorId,
+          }));
       setOrdenes((prev) => [...prev, ...(extra || [])]);
       setHasMore(!!more);
       setNextCursor(cursor || null);
@@ -86,20 +122,20 @@ export default function OrdenesTrabajo() {
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [hasMore, loadingMore, isSearching, debouncedTerm, nextCursor]);
 
-  // Montaje
+  // Montaje / cambios de modo búsqueda
   useEffect(() => {
     loadFirstPage();
-  }, []);
+  }, [loadFirstPage]);
 
-  // Al cerrar modal, refrescar primera página (para ver cambios)
+  // Al cerrar modal, refrescar primera página (para ver cambios) -> evita loop
   useEffect(() => {
     if (!showModal) {
       const t = setTimeout(() => loadFirstPage(), 150);
       return () => clearTimeout(t);
     }
-  }, [showModal, ordenes]);
+  }, [showModal, loadFirstPage]);
 
   const columns = useMemo(
     () => [
@@ -237,31 +273,52 @@ export default function OrdenesTrabajo() {
         ),
       },
     ],
-    [userRole]
+    [userRole, fmtDate]
   );
 
-  const filteredItems = useMemo(
-    () =>
-      ordenes.filter((o) => {
-        const term = filterText.toLowerCase();
+  // Filtrado local SOLO en modo "listar" (no en modo búsqueda)
+  const filteredItems = useMemo(() => {
+    if (isSearching) return ordenes; // backend ya filtró
+    const term = normalize(filterText);
+    if (!term) return ordenes;
 
-        const nombreCompleto = [
+    return ordenes.filter((o) => {
+      const nombreCompleto = normalize(
+        [
           o?.cliente?.nombre,
           o?.cliente?.apellidoPaterno,
           o?.cliente?.apellidoMaterno,
         ]
           .filter(Boolean)
           .join(" ")
-          .toLowerCase();
+      );
+      const telefonos = Array.isArray(o?.cliente?.telefonos)
+        ? o.cliente.telefonos.map(digitsOnly).join(" ")
+        : digitsOnly(o?.cliente?.telefono);
+      const dirObj = o?.cliente?.direccion;
+      const direccion = Array.isArray(dirObj)
+        ? normalize(dirObj.join(" "))
+        : typeof dirObj === "object" && dirObj !== null
+        ? normalize(Object.values(dirObj).filter(Boolean).join(" "))
+        : normalize(dirObj);
 
-        return (
-          (o.folio || "").toLowerCase().includes(term) ||
-          nombreCompleto.includes(term) ||
-          (o.status || "").toLowerCase().includes(term)
-        );
-      }),
-    [ordenes, filterText]
-  );
+      const folio = normalize(o?.folio);
+      const status = normalize(o?.status);
+      const termDigits = digitsOnly(term);
+
+      const haystack = [
+        folio,
+        nombreCompleto,
+        direccion,
+        status,
+        telefonos,
+      ].join(" ");
+      return (
+        haystack.includes(term) ||
+        (termDigits && telefonos.includes(termDigits))
+      );
+    });
+  }, [ordenes, filterText, isSearching]);
 
   const SubHeaderComponent = useMemo(
     () => (
@@ -273,7 +330,7 @@ export default function OrdenesTrabajo() {
           <input
             type="text"
             className="form-control form-control-sm"
-            placeholder="Buscar folio, cliente o status..."
+            placeholder="Buscar por folio, nombre, teléfono, dirección o status..."
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
           />
@@ -312,7 +369,7 @@ export default function OrdenesTrabajo() {
           <DataTable
             title="Órdenes de Trabajo"
             columns={columns}
-            data={filteredItems}
+            data={isSearching ? ordenes : filteredItems}
             progressPending={loading && ordenes.length === 0}
             pagination
             paginationPerPage={10}

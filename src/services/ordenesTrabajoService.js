@@ -8,7 +8,6 @@ const FORCE_DEV = import.meta.env.VITE_FORCE_DEV === "true";
 const USE_EMULATOR = import.meta.env.DEV && FORCE_DEV;
 
 // Base URL de tus Functions: emulador en DEV, Cloud en prod
-// Construimos la URL base:
 const BASE = USE_EMULATOR
   ? import.meta.env.VITE_FUNCTIONS_EMULATOR_URL
   : `https://us-central1-${
@@ -31,10 +30,10 @@ async function authHeaders() {
 }
 
 /**
- * Obtener órdenes de trabajo paginadas (por fecha de creación)
+ * Obtener órdenes de trabajo paginadas (por updatedAt desc)
  * @param {Object} opts
- * @param {number} [opts.limit=20] - Límite por página
- * @param {string|null} [opts.cursorSort] - Fecha ISO del último elemento
+ * @param {number} [opts.limit=20]
+ * @param {string|null} [opts.cursorSort] - Fecha ISO del último elemento (updatedAt)
  * @param {string|null} [opts.cursorId]   - ID del último elemento
  * @returns {Promise<{ ordenes: any[], pageSize: number, hasMore: boolean, nextCursor: {cursorSort: string, cursorId: string} | null }>}
  */
@@ -56,35 +55,48 @@ export async function obtenerOrdenesTrabajo(opts = {}) {
 }
 
 /**
- * Obtener órdenes de trabajo pendientes
- * @return {Promise<Array>} lista de órdenes pendientes
+ * Obtener órdenes de trabajo pendientes (status != PAGADO), con paginación
+ * @param {Object} opts
+ * @param {number} [opts.limit=20]
+ * @param {string|null} [opts.cursorStatus] - status del último elemento
+ * @param {string|null} [opts.cursorSort]   - ISO de updatedAt del último elemento
+ * @param {string|null} [opts.cursorId]     - id del último elemento
+ * @returns {Promise<{ ordenes: any[], pageSize: number, hasMore: boolean, nextCursor: {cursorStatus: string, cursorSort: string, cursorId: string} | null }>}
  */
-export async function obtenerOrdenesTrabajoPendientes() {
+export async function obtenerOrdenesTrabajoPendientes(opts = {}) {
+  const { limit = 20, cursorStatus, cursorSort, cursorId } = opts;
+
   const headers = await authHeaders();
-  // Llamamos al mismo endpoint y filtramos en frontend
-  const { data } = await axios.get(`${BASE}/ordenesTrabajo`, { headers });
-  return data.filter(
-    (orden) => orden.status !== "PAGADO" && orden.status !== "REVISADA"
+  const params = new URLSearchParams();
+
+  if (limit) params.append("limit", limit);
+  if (cursorStatus) params.append("cursorStatus", cursorStatus);
+  if (cursorSort) params.append("cursorSort", cursorSort);
+  if (cursorId) params.append("cursorId", cursorId);
+
+  const { data } = await axios.get(
+    `${BASE}/ordenesTrabajo/pendientes?${params.toString()}`,
+    { headers }
   );
+
+  // data => { ordenes, pageSize, hasMore, nextCursor }
+  return data;
 }
 
 /**
  * Obtener órdenes de trabajo en garantía
- * @return {Promise<Array>} lista de órdenes en garantía
+ * @return {Promise<{ ordenes: any[], total: number }>} respuesta cruda del backend
  */
 export async function obtenerOrdenesTrabajoGarantia() {
   const headers = await authHeaders();
   const { data } = await axios.get(`${BASE}/ordenesTrabajo/garantia`, {
     headers,
   });
-  console.log(data);
   return data;
 }
 
 /**
  * Obtener una orden de trabajo por ID
- * @param {string} id
- * @returns {Promise<Object>} orden de trabajo
  */
 export async function obtenerOrdenTrabajo(id) {
   const headers = await authHeaders();
@@ -94,8 +106,6 @@ export async function obtenerOrdenTrabajo(id) {
 
 /**
  * Registrar una nueva orden de trabajo
- * @param {Object} payload datos de la orden
- * @returns {Promise<Object>} orden creada
  */
 export async function registrarOrdenTrabajo(payload) {
   const headers = await authHeaders();
@@ -107,9 +117,6 @@ export async function registrarOrdenTrabajo(payload) {
 
 /**
  * Actualizar una orden de trabajo existente
- * @param {string} id
- * @param {Object} payload datos actualizados
- * @returns {Promise<Object>} orden actualizada
  */
 export async function actualizarOrdenTrabajo(id, payload) {
   const headers = await authHeaders();
@@ -121,8 +128,6 @@ export async function actualizarOrdenTrabajo(id, payload) {
 
 /**
  * Eliminar una orden de trabajo
- * @param {string} id
- * @returns {Promise<Object>} resultado de la operación
  */
 export async function eliminarOrdenTrabajo(id) {
   const headers = await authHeaders();
@@ -140,4 +145,29 @@ export async function existeFolio(folio) {
     { headers }
   );
   return !!data?.exists;
+}
+
+/**
+ * Buscar órdenes de trabajo por folio, nombre de cliente, teléfono, dirección o status
+ * (paginado con cursor, mismo shape que obtenerOrdenesTrabajo)
+ */
+export async function buscarOrdenesTrabajo({
+  q,
+  limit = 20,
+  cursorSort,
+  cursorId,
+}) {
+  const headers = await authHeaders();
+  const params = new URLSearchParams();
+
+  if (q) params.append("q", q);
+  if (limit) params.append("limit", limit);
+  if (cursorSort) params.append("cursorSort", cursorSort);
+  if (cursorId) params.append("cursorId", cursorId);
+
+  const { data } = await axios.get(
+    `${BASE}/ordenesTrabajo/search?${params.toString()}`,
+    { headers }
+  );
+  return data; // -> { ordenes, hasMore, nextCursor }
 }

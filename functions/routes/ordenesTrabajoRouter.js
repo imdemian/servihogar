@@ -27,8 +27,9 @@ router.post("/", async (req, res) => {
 });
 
 /**
- * Listar todas las órdenes de trabajo
+ * Listar todas las órdenes de trabajo (paginado por updatedAt desc, id desc)
  * GET /ordenesTrabajo
+ * Query: limit, cursorSort (ISO), cursorId
  */
 router.get("/", async (req, res) => {
   try {
@@ -75,13 +76,11 @@ router.get("/", async (req, res) => {
  */
 router.get("/garantia", async (_req, res) => {
   try {
-    // Consulta simple: solo trae las que tienen garantia === true
     const snap = await ordenesCol
       .where("garantia", "==", true)
-      .orderBy("updatedAt", "desc") // opcional, para consistencia
+      .orderBy("updatedAt", "desc")
       .get();
 
-    // Helper robusto para convertir fechas
     const toDateSafe = (v) => {
       if (!v) return null;
       if (typeof v?.toDate === "function") return v.toDate();
@@ -108,7 +107,6 @@ router.get("/garantia", async (_req, res) => {
         return true;
       });
 
-    // Reforzar orden si quieres
     ordenes.sort((a, b) => {
       const da = toDateSafe(a.fechaEntrega) || new Date(0);
       const db = toDateSafe(b.fechaEntrega) || new Date(0);
@@ -126,6 +124,165 @@ router.get("/garantia", async (_req, res) => {
     });
   } catch (error) {
     console.error("Error listando órdenes en garantía:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * Obtener órdenes de trabajo pendientes (STATUS != "PAGADO"), con paginación
+ * GET /ordenesTrabajo/pendientes
+ * Query: limit, cursorStatus, cursorSort (ISO updatedAt), cursorId
+ *
+ * 🔴 Requiere índice compuesto:
+ *   status (ASC), updatedAt (DESC), __name__ (DESC)
+ */
+router.get("/pendientes", async (req, res) => {
+  try {
+    const { limit: limitStr, cursorStatus, cursorSort, cursorId } = req.query;
+    const limit = Math.min(parseInt(limitStr || "20", 10), 100);
+
+    let q = ordenesCol
+      .where("status", "!=", "PAGADO")
+      .orderBy("status") // obligatorio con "!="
+      .orderBy("updatedAt", "desc")
+      .orderBy(admin.firestore.FieldPath.documentId(), "desc");
+
+    if (cursorStatus && cursorSort && cursorId) {
+      const csTs = admin.firestore.Timestamp.fromDate(new Date(cursorSort));
+      q = q.startAfter(cursorStatus, csTs, cursorId);
+    }
+
+    const snap = await q.limit(limit).get();
+
+    const ordenes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const last = snap.docs[snap.docs.length - 1] || null;
+    const nextCursor = last
+      ? {
+          cursorStatus: last.get("status"),
+          cursorSort:
+            last.get("updatedAt")?.toDate?.().toISOString?.() ||
+            new Date().toISOString(),
+          cursorId: last.id,
+        }
+      : null;
+
+    return res.json({
+      ordenes,
+      pageSize: ordenes.length,
+      hasMore: ordenes.length === limit,
+      nextCursor,
+      criteria: { statusNe: "PAGADO", order: "status asc, updatedAt desc" },
+    });
+  } catch (error) {
+    console.error("Error listando órdenes pendientes:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * Buscar órdenes de trabajo (folio, cliente, teléfono, dirección, status)
+ * GET /ordenesTrabajo/search?q=...&limit=20&cursorSort=...&cursorId=...
+ */
+router.get("/search", async (req, res) => {
+  try {
+    const { q, limit: limitStr, cursorSort, cursorId } = req.query;
+    if (!q) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Se requiere parámetro q" });
+    }
+
+    const limit = Math.min(parseInt(limitStr || "20", 10), 100);
+
+    const term = q
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    let query = ordenesCol
+      .orderBy("updatedAt", "desc")
+      .orderBy(admin.firestore.FieldPath.documentId(), "desc");
+
+    if (cursorSort && cursorId) {
+      const csTs = admin.firestore.Timestamp.fromDate(new Date(cursorSort));
+      query = query.startAfter(csTs, cursorId);
+    }
+
+    const snap = await query.limit(limit * 5).get();
+
+    const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    const normalize = (s) =>
+      (s ?? "")
+        .toString()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+    const digitsOnly = (s) => (s ?? "").toString().replace(/\D+/g, "");
+
+    const filtered = docs.filter((o) => {
+      const folio = normalize(o.folio);
+      const status = normalize(o.status);
+
+      const nombreCompleto = normalize(
+        [
+          o?.cliente?.nombre,
+          o?.cliente?.apellidoPaterno,
+          o?.cliente?.apellidoMaterno,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+
+      const telefonos = Array.isArray(o?.cliente?.telefonos)
+        ? o.cliente.telefonos.map(digitsOnly).join(" ")
+        : digitsOnly(o?.cliente?.telefono);
+
+      const dirObj = o?.cliente?.direccion;
+      const direccion = Array.isArray(dirObj)
+        ? normalize(dirObj.join(" "))
+        : typeof dirObj === "object" && dirObj !== null
+        ? normalize(Object.values(dirObj).filter(Boolean).join(" "))
+        : normalize(dirObj);
+
+      const termDigits = digitsOnly(term);
+
+      const haystack = [
+        folio,
+        status,
+        nombreCompleto,
+        direccion,
+        telefonos,
+      ].join(" ");
+      return (
+        haystack.includes(term) ||
+        (termDigits && telefonos.includes(termDigits))
+      );
+    });
+
+    const slice = filtered.slice(0, limit);
+
+    const last = slice[slice.length - 1] || null;
+    const nextCursor = last
+      ? {
+          cursorSort:
+            last.updatedAt?.toDate?.().toISOString?.() ||
+            new Date().toISOString(),
+          cursorId: last.id,
+        }
+      : null;
+
+    return res.json({
+      ordenes: slice,
+      pageSize: slice.length,
+      hasMore: filtered.length > slice.length,
+      nextCursor,
+    });
+  } catch (error) {
+    console.error("Error buscando órdenes de trabajo:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 });

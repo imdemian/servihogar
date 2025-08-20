@@ -25,3 +25,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# serviceAccount
+serviceAccount-crmserviHogar.json
+
+# Scripts
+scripts/

@@ -2,14 +2,17 @@
 import React, { useEffect, useState, useRef } from "react";
 import { buscarClientes } from "../../services/clientesService";
 import { obtenerEmpleados } from "../../services/empleadosService";
-import { registrarOrdenTrabajo } from "../../services/ordenesTrabajoService";
+import {
+  registrarOrdenTrabajo,
+  existeFolio,
+} from "../../services/ordenesTrabajoService";
 import { toast } from "react-toastify";
 import { faPlusCircle, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { generateUniqueFolio } from "../../utils/folioUtils";
 
 const RegistroOrdenServicio = ({ setShowModal }) => {
-  // Empleados (sí se cargan todos porque suele ser una lista corta)
+  // Empleados (suele ser lista corta)
   const [empleados, setEmpleados] = useState([]);
 
   // Autocompletado de Clientes
@@ -21,7 +24,12 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
   const [suggLoading, setSuggLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Click-outside para cerrar el dropdown
+  // Folio manual (opcional)
+  const [debouncedFolio, setDebouncedFolio] = useState("");
+  const [folioChecking, setFolioChecking] = useState(false);
+  const [folioAvailable, setFolioAvailable] = useState(null); // true | false | null
+
+  // Click-outside para cerrar dropdown
   const wrapperRef = useRef(null);
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -35,7 +43,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
 
   // Datos de la orden
   const [datosOrden, setDatosOrden] = useState({
-    folio: "",
+    folio: "", // ← ahora editable manualmente (opcional)
     cliente: {
       id: "",
       nombre: "",
@@ -55,7 +63,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     status: "CREADA",
   });
 
-  // Cargar empleados al montar
+  // Cargar empleados
   useEffect(() => {
     (async () => {
       try {
@@ -68,13 +76,13 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     })();
   }, []);
 
-  // Debounce del término de búsqueda
+  // Debounce del término de búsqueda de clientes
   useEffect(() => {
     const t = setTimeout(() => setDebouncedTerm(searchTerm.trim()), 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  // Buscar sugerencias en backend cuando hay término (>= 2)
+  // Buscar sugerencias de clientes
   useEffect(() => {
     const fetch = async () => {
       if (debouncedTerm.length < 2) {
@@ -101,6 +109,37 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     fetch();
   }, [debouncedTerm, searchField]);
 
+  // Debounce del folio manual para verificar disponibilidad
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const f = (datosOrden.folio || "").trim();
+      setDebouncedFolio(f);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [datosOrden.folio]);
+
+  // Verificar disponibilidad del folio cuando cambie el debouncedFolio
+  useEffect(() => {
+    const check = async () => {
+      const folio = debouncedFolio;
+      if (!folio) {
+        setFolioAvailable(null);
+        return;
+      }
+      setFolioChecking(true);
+      try {
+        const exists = await existeFolio(folio);
+        setFolioAvailable(!exists); // disponible si NO existe
+      } catch (e) {
+        console.error(e);
+        setFolioAvailable(null);
+      } finally {
+        setFolioChecking(false);
+      }
+    };
+    check();
+  }, [debouncedFolio]);
+
   // Cargar más sugerencias
   async function loadMoreSuggestions() {
     if (!suggCursor || suggLoading || debouncedTerm.length < 2) return;
@@ -122,7 +161,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     }
   }
 
-  // Seleccionar cliente de la lista
+  // Seleccionar cliente
   const selectCliente = (c) => {
     setDatosOrden((prev) => ({
       ...prev,
@@ -161,7 +200,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     }));
   };
 
-  // Validaciones + submit
+  // Submit
   const onSubmit = async (e) => {
     e.preventDefault();
 
@@ -172,7 +211,7 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     }
     // Validar equipos
     const equiposValidos = datosOrden.equipos.filter(
-      (eq) => eq.descripcion.trim() !== ""
+      (eq) => (eq.descripcion || "").trim() !== ""
     );
     if (equiposValidos.length === 0) {
       toast.warn("Debes agregar al menos un equipo con descripción válida.");
@@ -196,12 +235,27 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
     }
 
     try {
-      const folio = await generateUniqueFolio(10);
+      // Folio: usar manual si viene; si no, generar
+      let folio = (datosOrden.folio || "").trim();
+      if (folio) {
+        // Si el usuario lo proporcionó, verificar disponibilidad por si cambió desde el debounce
+        const exists = await existeFolio(folio);
+        if (exists) {
+          toast.error(
+            "El folio ya existe. Ingresa uno diferente o deja vacío para generar uno."
+          );
+          return;
+        }
+      } else {
+        folio = await generateUniqueFolio(10);
+      }
+
       const payload = {
         ...datosOrden,
         equipos: equiposValidos,
         folio,
       };
+
       await registrarOrdenTrabajo(payload);
       toast.success(`Orden registrada correctamente (folio: ${folio})`);
 
@@ -230,6 +284,8 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
       setSuggestions([]);
       setSuggCursor(null);
       setShowSuggestions(false);
+      setFolioAvailable(null);
+      setDebouncedFolio("");
       setShowModal(false);
     } catch (err) {
       console.error(err);
@@ -243,6 +299,38 @@ const RegistroOrdenServicio = ({ setShowModal }) => {
       onSubmit={onSubmit}
       ref={wrapperRef}
     >
+      {/* Folio manual (opcional) */}
+      <div className="mb-3">
+        <label className="form-label">Folio (opcional)</label>
+        <div className="d-flex gap-2 align-items-center">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="Ingresa un folio manual o deja vacío para generar uno"
+            value={datosOrden.folio}
+            onChange={(e) =>
+              setDatosOrden((prev) => ({ ...prev, folio: e.target.value }))
+            }
+          />
+          {folioChecking && (
+            <small className="text-muted ms-2">Verificando…</small>
+          )}
+          {!folioChecking &&
+            datosOrden.folio.trim() !== "" &&
+            folioAvailable === true && (
+              <small className="text-success ms-2">Disponible</small>
+            )}
+          {!folioChecking &&
+            datosOrden.folio.trim() !== "" &&
+            folioAvailable === false && (
+              <small className="text-danger ms-2">No disponible</small>
+            )}
+        </div>
+        <small className="text-muted">
+          Si lo dejas vacío, se generará uno automáticamente.
+        </small>
+      </div>
+
       {/* Cliente */}
       <div className="mb-4 position-relative">
         <label className="form-label">Cliente</label>

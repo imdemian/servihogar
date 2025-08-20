@@ -17,6 +17,7 @@
     "bootstrap": "^5.3.5",
     "dotenv": "^16.5.0",
     "firebase": "^11.6.1",
+    "firebase-admin": "^13.4.0",
     "fortawesome": "^0.0.1-security",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
